@@ -40,16 +40,15 @@ fi
 
 pushd "enet-${ENET_VERSION}"
 #build/rebuild the library..
+echo "***** Building library .......*"
 make
 make install
 popd
 
 #compile test app
+echo "***** Building test code ......*"
 pushd "test"
 export EMCC="${EMSCRIPTEN}/emcc"
 make -e test
+echo "type 'node test' to run tests"
 popd
-
-#run the test
-node test
-
