@@ -76,8 +76,13 @@ function JS_String_to_CString(jstr, ptr){
 
 var _static_ntoa_buffer;
 
-var Module = {
-    'preRun':function(){
+try{
+    if(Module){}
+}catch(e){
+    Module = {};
+}
+
+Module['preRun'] = function(){
     
         _static_ntoa_buffer=allocate(16, "i8", ALLOC_STATIC);
         
@@ -353,5 +358,5 @@ var Module = {
                 delete udp_sockets[$socket];
             }
         };
-     }//preRun
-}
+}//preRun
+
