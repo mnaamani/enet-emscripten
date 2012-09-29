@@ -8,5 +8,6 @@ to build the code:
 
 to run the tests:
 
-    node test
+    node test client server
+
 
