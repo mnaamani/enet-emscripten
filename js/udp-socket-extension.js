@@ -21,6 +21,9 @@ var global_udp_callback = function(msg,rinfo,sfd){
    http://a0002.blogspot.com/2008/06/ip-cidr-calculation-in-mysql-php-and.html
 */
 function long2ip(l) {
+    if(l<0){
+	 throw('long2ip got a negative number!');
+    }
     with (Math) {   
         var ip1 = floor(l/pow(256,3));
         var ip2 = floor((l%pow(256,3))/pow(256,2));
@@ -83,7 +86,10 @@ try{
 }
 
 Module['preRun'] = function(){
-    
+        _gethostbyname = _gehostbyname_r = function(){ return 0; }
+        _fcntl=function(){return -1;}
+        _ioctl=function(){return -1;}
+        
         _static_ntoa_buffer=allocate(16, "i8", ALLOC_STATIC);
         
         _inet_ntoa=function($in_0) {
@@ -162,7 +168,7 @@ Module['preRun'] = function(){
           var $8=HEAP16[(($7)>>1)];
           $port=$8;          
           if(udp_sockets[$socket]){
-              console.error("binding to port",$port);
+              //console.error("binding to port",$port);
               udp_sockets[$socket].bind($port,long2ip($host));
               return 0;
           }

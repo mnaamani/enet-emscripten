@@ -4,70 +4,113 @@
 #include <emscripten/emscripten.h>
 #include <sys/socket.h>
 
-ENetHost * glbl_server;
+//globals are a bad idea.. this is just for testing..
+ENetHost *server, *client;
+ENetPeer *peer;
 
-void my_event_loop();
+void network_event_loop();
+void service(ENetHost *);
 
-void main(int argc, char **argv ){
-
+ENetHost * createHost(int port,char *identifier){
     ENetAddress address;
-    enet_initialize();
-
-    /* Bind the server to the default localhost.     */
-    /* A specific host address can be specified by   */
-    /* enet_address_set_host (& address, "x.x.x.x"); */
+    ENetHost *host;
 
     address.host = ENET_HOST_ANY;
-    /* Bind the server to port 5000. */
-    address.port = 5000;
-
-    glbl_server = enet_host_create (& address /* the address to bind the server host to */,
+    address.port = port;
+    host = enet_host_create (&address /* the address to bind the server host to */,
                                  32      /* allow up to 32 clients and/or outgoing connections */,
                                   5      /* allow up to 5 channels to be used, 0 and 1 */,
                                   0      /* assume any amount of incoming bandwidth */,
                                   0      /* assume any amount of outgoing bandwidth */);
-    if (glbl_server == NULL)
+    if (host == NULL)
     {
-        fprintf (stderr,
-                 "An error occurred while trying to create an ENet server host.\n");
-        exit (EXIT_FAILURE);
+        fprintf (stderr,"An error occurred while trying to create an ENet host on port %d.\n",port);
     }
-
-    emscripten_set_main_loop(my_event_loop, 5);
+    printf("%s successfully created on port: %d\n",identifier, port);
+    return host;
 }
 
-void my_event_loop(){
+void main(int argc, char **argv ){
+    enet_initialize();
 
+    client = server = peer = NULL;
+
+    if(argc > 1 ){
+	    if(strcmp(argv[1],"server")==0 || strcmp(argv[2],"server")==0) server = createHost(5000,"server");
+	    if(strcmp(argv[1],"client")==0 || strcmp(argv[2],"client")==0) client = createHost(5001,"client");
+    }else{
+	server = createHost(5000,"server");
+    }
+    if( server == NULL && client == NULL ){
+	fprintf(stderr,"invalid arguments. specify either server or client, or no arguments for default server.\n");
+	 exit(0);//at aleast one host should be created
+    }
+
+    if(client != NULL ){
+	    ENetAddress address;
+	    struct in_addr A;
+	    inet_aton("127.0.0.1",&A);
+	    address.host = A.s_addr;
+	    address.port = 5000;
+	    peer = enet_host_connect(client,&address,2,0);
+    }
+
+    //run loop x times per second - for low latency requirement should be atleast 5
+    emscripten_set_main_loop(network_event_loop, 2);
+}
+void bye(){
+	emscripten_cancel_main_loop();
+	if(server!=NULL) enet_host_destroy(server);
+	if(client!=NULL) enet_host_destroy(client);
+}
+
+void network_event_loop(){
+    char packet_data[] = "ENet + Emscripten Rock!";
+    if(peer!=NULL){
+	ENetPacket *packet = enet_packet_create(packet_data,sizeof(packet_data),ENET_PACKET_FLAG_NO_ALLOCATE | ENET_PACKET_FLAG_RELIABLE);
+	enet_peer_send(peer,0,packet);
+	if(peer->packetsSent > 10){
+		enet_peer_disconnect_later(peer,0);
+	}
+    }
+    service(client);
+    service(server);
+}
+
+void service(ENetHost *host){
     ENetEvent event;
     struct in_addr addr;
-    enet_host_service (glbl_server, &event, 0);
+    if(host == NULL) return;
+    enet_host_service (host, &event, 0);
 
     switch (event.type)
     {
     case ENET_EVENT_TYPE_CONNECT:
         addr.s_addr = event.peer->address.host;
-        printf ("A new client connected from %s:%u.\n",
+        printf ("peer connection established with %s:%u.\n",
                 inet_ntoa(addr),
                 event.peer -> address.port);
 
         /* Store any relevant client information here. */
-        event.peer -> data = "Client information";
+        event.peer -> data = "- peer -";
         break;
 
     case ENET_EVENT_TYPE_RECEIVE:
-        printf ("A packet of length %u containing %s was received from %s on channel %u.\n",
-                event.packet -> dataLength,
+        printf ("'%s'[packet length:%u] received from '%s' [channel: %u].\n",
                 event.packet -> data,
+                event.packet -> dataLength,
                 event.peer -> data,
                 event.channelID);
-
         /* Clean up the packet now that we're done using it. */
         enet_packet_destroy (event.packet);
         break;
     case ENET_EVENT_TYPE_DISCONNECT:
-        printf ("%s disconected.\n", event.peer -> data);
+        printf ("peer disconected. [%s]\n", event.peer -> data);
         /* Reset the peer's client information. */
         event.peer -> data = NULL;
+	if(client != NULL ){
+		bye();
+	}
         break;
     }
 }
