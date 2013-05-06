@@ -51,7 +51,7 @@ int main(int argc, char **argv ){
 	    ENetAddress address;
 	    struct in_addr A;
 	    inet_aton("127.0.0.1",&A);
-	    address.host = A.s_addr;
+	    address.host = htonl(A.s_addr);
 	    address.port = 5000;
 	    peer = enet_host_connect(client,&address,2,0);
     }
