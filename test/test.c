@@ -1,8 +1,9 @@
-#include <enet/enet.h>
-#include <string.h>
-#include <stdio.h>
-#include <emscripten/emscripten.h>
+#include <sys/types.h>
 #include <sys/socket.h>
+#include <arpa/inet.h>
+#include <stdio.h>
+#include <enet/enet.h>
+#include <emscripten/emscripten.h>
 
 //globals are a bad idea.. this is just for testing..
 ENetHost *server, *client;
@@ -30,7 +31,7 @@ ENetHost * createHost(int port,char *identifier){
     return host;
 }
 
-void main(int argc, char **argv ){
+int main(int argc, char **argv ){
     enet_initialize();
 
     client = server = peer = NULL;
@@ -56,7 +57,8 @@ void main(int argc, char **argv ){
     }
 
     //run loop x times per second - for low latency requirement should be atleast 5
-    emscripten_set_main_loop(network_event_loop, 2);
+    emscripten_set_main_loop(network_event_loop, 2,1);
+    return 0;
 }
 void bye(){
 	emscripten_cancel_main_loop();

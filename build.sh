@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #version of ENet to use
-ENET_VERSION="1.3.5"
+ENET_VERSION="1.3.7"
 
 #default path to emscripten
 EMSCRIPTEN_HOME="${HOME}/Dev/emscripten"
