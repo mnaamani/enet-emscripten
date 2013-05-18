@@ -4,7 +4,7 @@
 ENET_VERSION="1.3.7"
 
 #default path to emscripten
-EMSCRIPTEN_HOME="${HOME}/Dev/emscripten"
+EMSCRIPTEN_HOME=`./find-emcc.py`
 
 # Retrieve EMSCRIPTEN path to use
 EMSCRIPTEN=$1
