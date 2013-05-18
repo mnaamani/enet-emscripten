@@ -1,6 +1,6 @@
 #include <sys/types.h>
-#include <sys/socket.h>
 #include <arpa/inet.h>
+#include <sys/socket.h>
 #include <stdio.h>
 #include <enet/enet.h>
 #include <emscripten/emscripten.h>
