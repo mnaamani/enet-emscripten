@@ -5,6 +5,6 @@ rebuild:
 	make clean
 	make build
 clean:
-	rm -fr enet-1.3.5/
+	rm -fr enet-1.3.7/
 	rm -fr libs/
 	rm -fr include/
