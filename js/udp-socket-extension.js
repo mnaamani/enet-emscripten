@@ -179,28 +179,12 @@ var ENetSocketsBackend = (function(){
       }
   };
 
-  // http://natesbox.com/blog/ip-cidr-conversion/
-  function long2ip(l, source) {
-    if(l<0){
-	 throw('long2ip got a negative number!');
-    }
-    with (Math) {   
-        var ip1 = floor(l/pow(256,3));
-        var ip2 = floor((l%pow(256,3))/pow(256,2));
-        var ip3 = floor(((l%pow(256,3))%pow(256,2))/pow(256,1));
-        var ip4 = floor((((l%pow(256,3))%pow(256,2))%pow(256,1))/pow(256,0));
-    }
-    return ip1 + '.' + ip2 + '.' + ip3 + '.' + ip4;
+  function long2ip(addr) {
+    return (addr & 0xff) + '.' + ((addr >> 8) & 0xff) + '.' + ((addr >> 16) & 0xff) + '.' + ((addr >> 24) & 0xff);
   }
-
-  function ip2long(ip) {
-    var ips = ip.split('.');
-    var iplong = 0;
-    with (Math) {
-        iplong = ips[0]*pow(256,3)+ips[1]*pow(256,2)+ips[2]*pow(256,1)+ips[3]*pow(256,0);
-    }
-    if(iplong<0) throw ('ip2long produced a negative number! '+iplong);
-    return iplong;
+  function ip2long(ipstr) {
+    var b = ipstr.split('.');
+    return (Number(b[0]) | (Number(b[1]) << 8) | (Number(b[2]) << 16) | (Number(b[3]) << 24)) >>> 0;
   }
 
   backend.ip2long = ip2long;
