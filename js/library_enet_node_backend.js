@@ -40,8 +40,8 @@ var node_sockets = {
             ['i32','host'],
             ['i16','port']
         ]),
-        getSocket:function($fd){
-            return ENetSockets.sockets[$fd];
+        getSocket:function(fd){
+            return ENetSockets.sockets[fd];
         },
         create:function(){
             var fd;
@@ -64,15 +64,15 @@ var node_sockets = {
             }            
         },
         bind:function($socket,$address){
-          var $host=0;
-          var $port=0;
+          var host=0;
+          var port=0;
           if($address){
-              $host = {{{ makeGetValue('$address', 'ENetSockets.ENetAddress_layout.host', 'i32') }}};
-              $port = {{{ makeGetValue('$address', 'ENetSockets.ENetAddress_layout.port', 'i16') }}};
+              host = {{{ makeGetValue('$address', 'ENetSockets.ENetAddress_layout.host', 'i32') }}};
+              port = {{{ makeGetValue('$address', 'ENetSockets.ENetAddress_layout.port', 'i16') }}};
           }
           if(ENetSockets.sockets[$socket]){
               try{
-                ENetSockets.sockets[$socket].bind($port,ENetSockets.long2ip($host));
+                ENetSockets.sockets[$socket].bind(port,ENetSockets.long2ip(host));
                 return 0;
               }catch(E){
                 return -1;
