@@ -138,12 +138,12 @@ var node_sockets = {
           var chunks = [];
           var chunk;
           var chunkLength;
-          var $sin=HEAP32[(($msgHdr)>>2)];
-          var $buffers=HEAP32[(($msgHdr+8)>>2)];
-          var $bufferCount=HEAPU32[($msgHdr+12)>>2];
+          var $sin = {{{ makeGetValue('$msgHdr', 'ENetSockets.msghdr_layout.msg_name', '*') }}};
+          var $buffers= {{{ makeGetValue('$msgHdr', 'ENetSockets.msghdr_layout.msg_iov', '*') }}};
+          var $bufferCount = {{{ makeGetValue('$msgHdr', 'ENetSockets.msghdr_layout.msg_iovlen', 'i32') }}};
           var packet = {};
           var addr = ENetSockets.get_sockaddr_in($sin);
-          var $x,i;
+          var $data,$x,i;
           for($x=0; $x < $bufferCount ; $x++ ){
               chunkLength = HEAP32[(($buffers+($x<<3)+4)>>2)];
               chunk = new Buffer(chunkLength);
