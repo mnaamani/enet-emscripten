@@ -112,12 +112,12 @@ var node_sockets = {
             ___setErrNo(ERRNO_CODES.EAGAIN);
             return -1;
           }
-          var $sin=HEAP32[(($msgHdr)>>2)];
-          var $buffer=HEAP32[(($msgHdr+8)>>2)];
+          var $sin = {{{ makeGetValue('$msgHdr', 'ENetSockets.msghdr_layout.msg_name', '*') }}};
+          var $buffer= {{{ makeGetValue('$msgHdr', 'ENetSockets.msghdr_layout.msg_iov', '*') }}};
           var $buffer_size = HEAP32[(($buffer+4)>>2)];
+          var $num = {{{ makeGetValue('$msgHdr', 'ENetSockets.msghdr_layout.msg_iovlen', 'i32') }}};//==1 enet only uses one buffer
           HEAP32[(($buffer+4)>>2)]=packet.dataLength;
-
-          var $data=HEAP32[($buffer)>>2];
+          var $data=getValue($buffer,'i32');
 
           for(var i=0;i<packet.dataLength && i<$buffer_size;i++){
             HEAPU8[($data+i)|0]=packet.data.readUInt8(i);
@@ -125,7 +125,7 @@ var node_sockets = {
           ENetSockets.set_sockaddr_in($sin,1,_htons(packet.port),ENetSockets.ip2long(packet.ip));
           if(packet.dataLength > $buffer_size){
             //MSG_TRUNC shall be set in the msg_flags member of the msghdr structure
-            HEAP32[($msgHdr+16)>>2] = 0x20;
+            {{{ makeSetValue('$msgHdr', 'ENetSockets.msghdr_layout.msg_flags', '0x20', 'i32') }}};
           }
           return packet.dataLength;
         },
