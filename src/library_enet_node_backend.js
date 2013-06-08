@@ -1,7 +1,8 @@
 /* If compiling with -O2 or --closure  make sure to include -s LINKABLE=1 */
 
 var node_sockets = {
-    $ENetSockets__postset:""+ 
+    $ENetSockets__postset:""+
+        "Module['preRun'].push(function(){"+ 
         "_gethostbyname = _gehostbyname_r = function(){ return 0; };"+
         "_fcntl=function(){return -1;};"+
         "_ioctl=function(){return -1;};"+
@@ -14,7 +15,8 @@ var node_sockets = {
         "_enet_socket_listen = function($socket, $backlog){};"+
         "_enet_socket_set_option = function(){return 0;};"+
         "_enet_socket_wait = function(){return -1;};"+
-        "_enet_socket_destroy = ENetSockets.destroy;",
+        "_enet_socket_destroy = ENetSockets.destroy;"+
+        "});",
 
     $ENetSockets__deps: ['__setErrNo', '$ERRNO_CODES'],
     $ENetSockets: {
