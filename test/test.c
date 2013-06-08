@@ -1,9 +1,12 @@
+#include <string.h>
 #include <sys/types.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <stdio.h>
 #include <enet/enet.h>
 #include <emscripten/emscripten.h>
+
+extern void init_enet_sockets_backend();
 
 //globals are a bad idea.. this is just for testing..
 ENetHost *server, *client;
@@ -32,9 +35,10 @@ ENetHost * createHost(int port,char *identifier){
 }
 
 int main(int argc, char **argv ){
+    init_enet_sockets_backend();
     enet_initialize();
-
-    client = server = peer = NULL;
+    client = server = NULL;
+    peer = NULL;
 
     if(argc > 1 ){
 	    if(strcmp(argv[1],"server")==0 || strcmp(argv[2],"server")==0) server = createHost(5000,"server");
@@ -87,6 +91,8 @@ void service(ENetHost *host){
 
     switch (event.type)
     {
+    case ENET_EVENT_TYPE_NONE:
+        return;
     case ENET_EVENT_TYPE_CONNECT:
         addr.s_addr = ntohl(event.peer->address.host);
         printf ("peer connection established with %s:%u.\n",
@@ -110,9 +116,9 @@ void service(ENetHost *host){
         printf ("peer disconected. [%s]\n", event.peer -> data);
         /* Reset the peer's client information. */
         event.peer -> data = NULL;
-	if(client != NULL ){
-		bye();
-	}
+    	if(client != NULL ){
+	    	bye();
+	    }
         break;
     }
 }
