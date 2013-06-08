@@ -36,6 +36,10 @@ var node_sockets = {
           ['i32', 'msg_controllen'],
           ['i32', 'msg_flags'],
         ]),
+        ENetAddress_layout: Runtime.generateStructInfo([
+            ['i32','host'],
+            ['i16','port']
+        ]),
         getSocket:function($fd){
             return ENetSockets.sockets[$fd];
         },
@@ -63,11 +67,10 @@ var node_sockets = {
           var $host=0;
           var $port=0;
           if($address){
-              $host = HEAPU32[(($address)>>2)];
-              $port = HEAPU16[(($address+4)>>1)];
+              $host = {{{ makeGetValue('$address', 'ENetSockets.ENetAddress_layout.host', 'i32') }}};
+              $port = {{{ makeGetValue('$address', 'ENetSockets.ENetAddress_layout.port', 'i16') }}};
           }
           if(ENetSockets.sockets[$socket]){
-              //console.error("binding to",long2ip($host),$port);
               try{
                 ENetSockets.sockets[$socket].bind($port,ENetSockets.long2ip($host));
                 return 0;
@@ -81,15 +84,15 @@ var node_sockets = {
         },
         get_sockaddr_in:function($sin){
           return ({
-              "family": HEAP32[($sin+0)>>1],
-              "port":   HEAPU16[($sin+4)>>1],
-              "addr":   HEAPU32[($sin+8)>>2]
+              "family": {{{ makeGetValue('$sin', 'ENetSockets.sockaddr_in_layout.sin_family', 'i32') }}},
+              "port": {{{ makeGetValue('$sin', 'ENetSockets.sockaddr_in_layout.sin_port', 'i16') }}},
+              "addr": {{{ makeGetValue('$sin', 'ENetSockets.sockaddr_in_layout.sin_addr', 'i32') }}}
           });
         },
         set_sockaddr_in:function($sin,family,port,address){
-          HEAP32[($sin+0)>>1] = family;
-          HEAP16[($sin+4)>>1] = port;
-          HEAPU32[($sin+8)>>2] = address;
+          {{{ makeSetValue('$sin', 'ENetSockets.sockaddr_in_layout.sin_family', 'family', 'i32') }}};
+          {{{ makeSetValue('$sin', 'ENetSockets.sockaddr_in_layout.sin_port', 'port', 'i16') }}};
+          {{{ makeSetValue('$sin', 'ENetSockets.sockaddr_in_layout.sin_addr', 'address', 'i32') }}};
         },
           /*
            * http://pubs.opengroup.org/onlinepubs/009695399/functions/recvmsg.html
