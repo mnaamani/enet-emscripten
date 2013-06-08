@@ -55,7 +55,7 @@ int main(int argc, char **argv ){
 	    ENetAddress address;
 	    struct in_addr A;
 	    inet_aton("127.0.0.1",&A);
-	    address.host = ntohl(A.s_addr);
+	    address.host = A.s_addr;
 	    address.port = 5000;
 	    peer = enet_host_connect(client,&address,2,0);
     }
@@ -94,7 +94,7 @@ void service(ENetHost *host){
     case ENET_EVENT_TYPE_NONE:
         return;
     case ENET_EVENT_TYPE_CONNECT:
-        addr.s_addr = ntohl(event.peer->address.host);
+        addr.s_addr = event.peer->address.host;
         printf ("peer connection established with %s:%u.\n",
                 inet_ntoa(addr),
                 event.peer -> address.port);
