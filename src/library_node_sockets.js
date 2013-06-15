@@ -46,18 +46,21 @@ mergeInto(LibraryManager.library, {
     socket__deps: ['$NodeSockets', '__setErrNo', '$ERRNO_CODES'],
     socket: function(family, type, protocol) {
         var fd;
-        if(!(family == {{{ cDefine('AF_INET') }}} || family == {{{ cDefine('PF_INET') }}}))
+        //if(!(family == {{{ cDefine('AF_INET') }}} || family == {{{ cDefine('PF_INET') }}}))
+        if(!(family == {{{ cDefine('AF_INET') }}} || family == 2))
         {
             ___setErrNo(ERRNO_CODES.EAFNOSUPPORT);
             return -1;
         }
 
         var stream = type == {{{ cDefine('SOCK_STREAM') }}};
-        var dgram = type == {{{ cDefine('SOCK_DGRAM') }}};
+        //var dgram = type == {{{ cDefine('SOCK_DGRAM') }}};
+        var dgram = type == 20;
 
         if (protocol) {
           assert(stream == (protocol == {{{ cDefine('IPPROTO_TCP') }}})); // if stream, must be tcp
-          assert(dgram  == (protocol == {{{ cDefine('IPPROTO_UDP') }}})); // if dgram, must be udp
+          //assert(dgram  == (protocol == {{{ cDefine('IPPROTO_UDP') }}})); // if dgram, must be udp
+          assert(dgram  == (protocol == 2)); // if dgram, must be udp
         }
 
         try{
