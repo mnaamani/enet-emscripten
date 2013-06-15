@@ -5,8 +5,6 @@
 mergeInto(LibraryManager.library, {
   $NodeSockets__deps: ['__setErrNo', '$ERRNO_CODES'],
   $NodeSockets: {
-    BUFFER_SIZE: 10*1024, // initial size
-    MAX_BUFFER_SIZE: 10*1024*1024, // maximum size we will grow the buffer
     sockaddr_in_layout: Runtime.generateStructInfo([
       ['i32', 'sin_family'],
       ['i16', 'sin_port'],
@@ -29,7 +27,7 @@ mergeInto(LibraryManager.library, {
      // int close(int fildes);
      // http://pubs.opengroup.org/onlinepubs/000095399/functions/close.html
      if(FS.streams[fildes].socket){
-        if(typeof FS.streams[fildes].close == 'function') FS.streams[fildes].close();//udp sockets
+        if(typeof FS.streams[fildes].close == 'function') FS.streams[fildes].close();//udp sockets, tcp listening sockets
         if(typeof FS.streams[fildes].end == 'function') FS.streams[fildes].end();//tcp connections
         return 0;
      }
@@ -47,7 +45,7 @@ mergeInto(LibraryManager.library, {
     },
     socket__deps: ['$NodeSockets', '__setErrNo', '$ERRNO_CODES'],
     socket: function(family, type, protocol) {
-        var fd;        
+        var fd;
         if(!(family == {{{ cDefine('AF_INET') }}} || family == {{{ cDefine('PF_INET') }}}))
         {
             ___setErrNo(ERRNO_CODES.EAFNOSUPPORT);
@@ -95,17 +93,15 @@ mergeInto(LibraryManager.library, {
    /*
     *   http://pubs.opengroup.org/onlinepubs/009695399/functions/connect.html
     */
-    connect__deps: ['$NodeSockets', '_inet_ntop_raw', 'htons', 'gethostbyname', '__setErrNo', '$ERRNO_CODES'],
+    connect__deps: ['$NodeSockets', '_inet_ntop_raw', 'htons', '__setErrNo', '$ERRNO_CODES'],
     connect: function(fd, addr, addrlen) {
         if(typeof fd == 'number' && (fd > 64 || fd < 1) ){
             ___setErrNo(ERRNO_CODES.EBADF); return -1;
         }
         var info = FS.streams[fd];
-        if (!info) {
+        if (!info || !info.socket) {
             ___setErrNo(ERRNO_CODES.ENOTSOCK); return -1;
         }
-
-        info.connected = true;
 
         if(info.dgram){
             if (info.socket._bound || info.socket.__receiving){
@@ -119,6 +115,16 @@ mergeInto(LibraryManager.library, {
         if(info.stream && info.ESTABLISHED){
             ___setErrNo(ERRNO_CODES.EISCONN); return -1;
         }
+        if(info.stream && info.CLOSED){
+            //only do a successful connect once per socket
+            ___setErrNo(ERRNO_CODES.ECONNRESET); return -1;
+        }
+        if(info.stream && info.socket.server){
+            //listening tcp socket cannot connect
+            ___setErrNo(ERRNO_CODES.EOPNOTSUPP); return -1;
+        }
+
+        info.connected = true;
 
         info.addr = getValue(addr + NodeSockets.sockaddr_in_layout.sin_addr, 'i32');
         info.port = _htons(getValue(addr + NodeSockets.sockaddr_in_layout.sin_port, 'i16'));
@@ -193,19 +199,27 @@ mergeInto(LibraryManager.library, {
     },
     recv__deps: ['$NodeSockets','recvfrom'],
     recv: function(fd, buf, len, flags) {
+        var info = FS.streams[fd];
+        if (!info || !info.socket) {
+            ___setErrNo(ERRNO_CODES.ENOTSOCK); return -1;
+        }
         return _recvfrom(fd,buf,len,flags,0,0);
     },
     send__deps: ['$NodeSockets'],
     send: function(fd, buf, len, flags) {
         var info = FS.streams[fd];
-        if (!info) return -1;
+        if (!info || !info.socket) {
+            ___setErrNo(ERRNO_CODES.ENOTSOCK); return -1;
+        }
         info.sender(HEAPU8.subarray(buf, buf+len));
         return len;
     },
     sendmsg__deps: ['$NodeSockets', 'connect'],
     sendmsg: function(fd, msg, flags) {
         var info = FS.streams[fd];
-        if (!info) return -1;
+        if (!info || !info.socket) {
+            ___setErrNo(ERRNO_CODES.ENOTSOCK); return -1;
+        }
         // if we are not connected, use the address info in the message
         if (!info.connected) {
           var name = {{{ makeGetValue('msg', 'NodeSockets.msghdr_layout.msg_name', '*') }}};
@@ -240,7 +254,9 @@ mergeInto(LibraryManager.library, {
     recvmsg__deps: ['$NodeSockets', 'connect', 'recv', '__setErrNo', '$ERRNO_CODES', 'htons'],
     recvmsg: function(fd, msg, flags) {
         var info = FS.streams[fd];
-        if (!info) return -1;
+        if (!info || !info.socket) {
+            ___setErrNo(ERRNO_CODES.ENOTSOCK); return -1;
+        }
         if (!info.hasData()) {
           ___setErrNo(ERRNO_CODES.EWOULDBLOCK);
           return -1;
@@ -297,7 +313,9 @@ mergeInto(LibraryManager.library, {
     recvfrom__deps: ['$NodeSockets'],
     recvfrom: function(fd, buf, len, flags, addr, addrlen) {
         var info = FS.streams[fd];
-        if (!info) return -1;
+        if (!info || !info.socket) {
+            ___setErrNo(ERRNO_CODES.ENOTSOCK); return -1;
+        }
         if (!info.hasData()) {
           ___setErrNo(ERRNO_CODES.EAGAIN); // no data, and all sockets are nonblocking, so this is the right behavior
           return -1;
@@ -327,14 +345,18 @@ mergeInto(LibraryManager.library, {
     
     shutdown: function(fd, how) {
         var info = FS.streams[fd];
-        if (!info) return -1;
+        if (!info || !info.socket) {
+            ___setErrNo(ERRNO_CODES.ENOTSOCK); return -1;
+        }
         if(info.socket) _close(fd);
         return 0;
     },
     
     ioctl: function(fd, request, varargs) {
         var info = FS.streams[fd];
-        if (!info) return -1;
+        if (!info || !info.socket) {
+            ___setErrNo(ERRNO_CODES.ENOTSOCK); return -1;
+        }
         var bytes = 0;
         if (info.hasData()) {
           bytes = info.inQueue[0].length;
@@ -355,7 +377,7 @@ mergeInto(LibraryManager.library, {
             ___setErrNo(ERRNO_CODES.EBADF); return -1;
         }
         var info = FS.streams[fd];
-        if (!info) {
+        if (!info || !info.socket) {
             ___setErrNo(ERRNO_CODES.ENOTSOCK); return -1;
         }
         function inet_addr_raw(str) {
@@ -406,12 +428,13 @@ mergeInto(LibraryManager.library, {
             ___setErrNo(ERRNO_CODES.EBADF); return -1;
         }
         var info = FS.streams[fd];
-        if (!info) {
+        if (!info || !info.socket) {
             ___setErrNo(ERRNO_CODES.ENOTSOCK); return -1;
         }
         assert(info.stream);
-        info.server = require("net").createServer();
-        info.server.listen(info.local_port||0,info.local_host,backlog,function(){
+        info.socket = require("net").createServer();
+        info.server = info.socket;//mark it as a listening socket
+        info.socket.listen(info.local_port||0,info.local_host,backlog,function(){
             //todo: complete.. que incoming connections..
         });
         return 0;
