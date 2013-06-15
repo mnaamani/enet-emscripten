@@ -20,7 +20,11 @@ mergeInto(LibraryManager.library, {
       ['*', 'msg_control'],
       ['i32', 'msg_controllen'],
       ['i32', 'msg_flags'],
-    ])
+    ]),
+    inet_pton_raw: function(str) {
+        var b = str.split(".");
+        return (Number(b[0]) | (Number(b[1]) << 8) | (Number(b[2]) << 16) | (Number(b[3]) << 24)) >>> 0;
+    }    
    },
    close__deps: ['$FS', '__setErrNo', '$ERRNO_CODES'],
    close: function(fildes) {
@@ -320,6 +324,7 @@ mergeInto(LibraryManager.library, {
             ___setErrNo(ERRNO_CODES.ENOTSOCK); return -1;
         }
         if (!info.hasData()) {
+          //todo: should return 0 if info.stream && info.CLOSED ?
           ___setErrNo(ERRNO_CODES.EAGAIN); // no data, and all sockets are nonblocking, so this is the right behavior
           return -1;
         }
@@ -351,7 +356,14 @@ mergeInto(LibraryManager.library, {
         if (!info || !info.socket) {
             ___setErrNo(ERRNO_CODES.ENOTSOCK); return -1;
         }
+        //todo: if how = 0 disable sending info.sender=function(){return -1;}
+        //             = 1 disable receiving (delete info.inQueue?)
+        if(info.socket && fd > 63){
+            info.socket.close && info.socket.close();
+            info.socket.end && info.socket.end();
+        }
         if(info.socket) _close(fd);
+        
         return 0;
     },
     
@@ -383,10 +395,7 @@ mergeInto(LibraryManager.library, {
         if (!info || !info.socket) {
             ___setErrNo(ERRNO_CODES.ENOTSOCK); return -1;
         }
-        function inet_addr_raw(str) {
-            var b = str.split(".");
-            return (Number(b[0]) | (Number(b[1]) << 8) | (Number(b[2]) << 16) | (Number(b[3]) << 24)) >>> 0;
-        }
+        
         try{
           if(addr){
             info.local_addr = getValue(addr + NodeSockets.sockaddr_in_layout.sin_addr, 'i32');
@@ -406,7 +415,7 @@ mergeInto(LibraryManager.library, {
                     var buf = new Uint8Array(msg);
                     //console.log("received:",msg);
                     buf.from = {
-                        addr: inet_addr_raw(rinfo.address),
+                        addr: NodeSockets.inet_pton_raw(rinfo.address),
                         port: rinfo.port
                     }
                     info.inQueue.push(buf);
@@ -437,23 +446,108 @@ mergeInto(LibraryManager.library, {
         assert(info.stream);
         info.socket = require("net").createServer();
         info.server = info.socket;//mark it as a listening socket
-        info.socket.listen(info.local_port||0,info.local_host,backlog,function(){
-            //todo: complete.. que incoming connections..
+        info.connQueue = [];
+        info.socket.listen(info.local_port||0,info.local_host,backlog,function(){});
+        info.socket.on("connection",function(socket){
+            info.connQueue.push(socket);
         });
         return 0;
     },
+    
     accept: function(fd, addr, addrlen) {
-        return -1;
-/*
-    var info = NodeSockets.fds[fd];
-    if (!info) return -1;
-    if (addr) {
-      setValue(addr + NodeSockets.sockaddr_in_layout.sin_addr, info.addr, 'i32');
-      setValue(addr + NodeSockets.sockaddr_in_layout.sin_port, info.port, 'i32');
-      setValue(addrlen, NodeSockets.sockaddr_in_layout.__size__, 'i32');
-    }
-    return fd;
-*/
+        if(typeof fd == 'number' && (fd > 64 || fd < 1) ){
+            ___setErrNo(ERRNO_CODES.EBADF); return -1;
+        }
+        var info = FS.streams[fd];
+        if (!info || !info.socket) {
+            ___setErrNo(ERRNO_CODES.ENOTSOCK); return -1;
+        }
+        
+        if(!info.server){   //not a listening socket
+            ___setErrNo(ERRNO_CODES.EINVAL); return -1;
+        }
+        if(info.connQueue.length == 0) {
+            ___setErrNo(ERRNO_CODES.EAGAIN); return -1;
+        }
+        
+        var newfd = FS.createFileHandle({
+            socket:false,   //newfd will be > 63
+            inQueue:[]
+        });
+
+        if(newfd == -1){
+            ___setErrNo(ERRNO_CODES.ENFILE); return -1;
+        }
+
+        var conn = FS.streams[newfd];
+        conn.socket = info.connQueue.shift();
+        
+        conn.addr = NodeSockets.inet_pton_raw(conn.socket.remoteAddress);
+        conn.port = _htons(conn.socket.remotePort);
+        conn.host = conn.socket.remoteAddress;
+                
+        if (addr) {
+            setValue(addr + NodeSockets.sockaddr_in_layout.sin_addr, conn.addr, 'i32');
+            setValue(addr + NodeSockets.sockaddr_in_layout.sin_port, conn.port, 'i32');
+            setValue(addrlen, NodeSockets.sockaddr_in_layout.__size__, 'i32');
+        }
+        
+        (function(info){
+            var intervalling = false, interval;
+            var outQueue = [];
+            info.hasData = function() { return info.inQueue.length > 0 }
+            info.ESTABLISHED = true;
+
+            function onEnded(){
+                info.ESTABLISHED = false;
+                info.CLOSED = true;
+            }
+            info.sender = function(buf){
+                outQueue.push(buf);
+                trySend();
+            };
+
+            function send(data) {
+                var buff = new Buffer(data);
+                if(!info.socket.write(buff)) info.paused = true;
+            }
+            function trySend() {
+                if (!info.ESTABLISHED) {
+                  if (!intervalling) {
+                    intervalling = true;
+                    interval = setInterval(trySend, 100);
+                  }
+                  return;
+                }
+                for (var i = 0; i < outQueue.length; i++) {
+                   send(outQueue[i]);
+                }
+                outQueue.length = 0;
+                if (intervalling) {
+                    intervalling = false;
+                    clearInterval(interval);
+                }
+            }
+
+            info.socket.on('drain',function(){
+               info.paused = false;
+            });
+
+            info.socket.on('data',function(buf){
+                info.inQueue.push(new Uint8Array(buf));
+            });
+
+            info.socket.on('close',onEnded);
+            info.socket.on('error',onEnded);
+            info.socket.on('end',onEnded);
+            info.socket.on('timeout',function(){
+                info.socket.end();
+                onEnded();
+            });
+        })(conn);
+        
+        return newfd;
+
     },
    /*
     *  http://pubs.opengroup.org/onlinepubs/009695399/functions/select.html
