@@ -1,0 +1,15 @@
+{
+  "manifest_version": 2,
+  "name": "emscripten chrome sockets",
+  "description":"emscripten chrome sockets",
+  "version":"0.1",
+  "permissions":[
+    {
+    "socket": ["udp-send-to:*:*","udp-bind"]}
+  ],
+  "app":{
+	"background":{
+	  "scripts":["background.js"]
+	}
+  }
+}
