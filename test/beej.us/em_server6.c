@@ -25,17 +25,17 @@ int serverfd;
 
 int main(int argc, char *argv[])
 {
-    struct sockaddr_in server;
+    struct sockaddr_in6 server;
 
-    inet_pton(AF_INET,"127.0.0.1", &server.sin_addr);
-    server.sin_port = htons(PORT);
+    inet_pton(AF_INET6,"::1",&server.sin6_addr);
+    server.sin6_port = htons(PORT);
 
-    if ((serverfd = socket(AF_INET,SOCK_STREAM,0)) == -1){
+    if ((serverfd = socket(AF_INET6,SOCK_STREAM,0)) == -1){
 		perror("server: socket");
         return 1;
 	}
 
-	if (bind(serverfd, (struct sockaddr*)&server, sizeof(struct sockaddr_in)) == -1) {
+	if (bind(serverfd, (struct sockaddr*)&server, sizeof(struct sockaddr_in6)) == -1) {
 		close(serverfd);
 		perror("server: bind");
 		return 1;
@@ -52,7 +52,7 @@ int main(int argc, char *argv[])
 
 void network_event_loop(){
     socklen_t sin_size;
-    struct sockaddr_in their_addr;
+    struct sockaddr_in6 their_addr;
    	sin_size = sizeof their_addr;
 	char s[256];
 
@@ -62,8 +62,8 @@ void network_event_loop(){
 		return;
 	}
 
-	inet_ntop(their_addr.sin_family,
-		&their_addr.sin_addr,
+	inet_ntop(their_addr.sin6_family,
+		&their_addr.sin6_addr,
 		s, sizeof s);
 
 	printf("server: got connection from %s\n", s);

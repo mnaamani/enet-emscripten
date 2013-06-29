@@ -18,7 +18,5 @@ test_inet.js: test_inet.c
 	$(EMCC) test_inet.c ../libs/inet_ntop.o ../libs/inet_pton.o -o test_inet.js --js-library ../src/library_node_sockets.js
 
 chrome-ext:
+	mkdir -p chrome/
 	$(EMCC) test-new.c -lenet -L../libs -I../include -o chrome/index.js --js-library ../src/library_node_sockets.js -s CHROME_SOCKETS=1 -O2 
-
-oldway:
-	$(EMCC) test.c -lenet -L../libs -I../include -o index.js --pre-js ../src/udp-socket-extension.js -s ASM_JS=0
