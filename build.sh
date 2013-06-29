@@ -49,6 +49,6 @@ popd
 echo "***** Building test code ......*"
 pushd "test"
 export EMCC="${EMSCRIPTEN}/emcc"
-make -e test
+make -e enetsockets
 echo "type 'node test client server' to run a simple test"
 popd

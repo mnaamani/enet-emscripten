@@ -12,6 +12,13 @@ mergeInto(LibraryManager.library, {
       ['i32', 'sin_zero'],
       ['i16', 'sin_zero_b'],
     ]),
+    sockaddr_in6_layout: Runtime.generateStructInfo([
+      ['i16', 'sin6_family'],
+      ['i16', 'sin6_port'],
+      ['i32', 'sin6_flowinfo'],
+      ['b16', 'sin6_addr'],//<< struct in6_addr
+      ['i32', 'sin6_scopeid'],
+    ]),
     msghdr_layout: Runtime.generateStructInfo([
       ['*', 'msg_name'],
       ['i32', 'msg_namelen'],
@@ -21,9 +28,12 @@ mergeInto(LibraryManager.library, {
       ['i32', 'msg_controllen'],
       ['i32', 'msg_flags'],
     ]),
-    inet_pton_raw: function(str) {
+    inet_aton_raw: function(str) {
         var b = str.split(".");
         return (Number(b[0]) | (Number(b[1]) << 8) | (Number(b[2]) << 16) | (Number(b[3]) << 24)) >>> 0;
+    },
+    inet_ntoa_raw: function(addr) {
+        return (addr & 0xff) + '.' + ((addr >> 8) & 0xff) + '.' + ((addr >> 16) & 0xff) + '.' + ((addr >> 24) & 0xff)
     },
     DGRAM:function(){
         if(typeof require !== 'undefined') return require("dgram");//node or browserified
@@ -185,6 +195,38 @@ mergeInto(LibraryManager.library, {
         },
 #endif
    },
+   htonl: function(value) {
+    return ((value & 0xff) << 24) + ((value & 0xff00) << 8) +
+           ((value & 0xff0000) >>> 8) + ((value & 0xff000000) >>> 24);
+   },
+   htons: function(value) {
+    return ((value & 0xff) << 8) + ((value & 0xff00) >> 8);
+   },
+   ntohl: 'htonl',
+   ntohs: 'htons',
+   inet_addr: function(ptr) {
+     var b = Pointer_stringify(ptr).split(".");
+     if (b.length !== 4) return -1; // we return -1 for error, and otherwise a uint32. this helps inet_pton differentiate
+     return (Number(b[0]) | (Number(b[1]) << 8) | (Number(b[2]) << 16) | (Number(b[3]) << 24)) >>> 0;
+   },
+  inet_ntoa__deps: ['$NodeSockets'],
+  inet_ntoa: function(in_addr) {
+    if (!_inet_ntoa.buffer) {
+      _inet_ntoa.buffer = _malloc(1024);
+    }
+    var addr = getValue(in_addr, 'i32');
+    var str = NodeSockets.inet_ntoa_raw(addr);
+    writeStringToMemory(str.substr(0, 1024), _inet_ntoa.buffer);
+    return _inet_ntoa.buffer;
+  },
+
+  inet_aton__deps: ['inet_addr'],
+  inet_aton: function(cp, inp) {
+    var addr = _inet_addr(cp);
+    setValue(inp, addr, 'i32');
+    if (addr < 0) return 0;
+    return 1;
+  },
    close__deps: ['$FS', '__setErrNo', '$ERRNO_CODES'],
    close: function(fildes) {
      // int close(int fildes);
@@ -210,11 +252,12 @@ mergeInto(LibraryManager.library, {
     socket: function(family, type, protocol) {
         var fd;
         //if(!(family == {{{ cDefine('AF_INET') }}} || family == {{{ cDefine('PF_INET') }}}))
-        if(!(family == {{{ cDefine('AF_INET') }}} || family == 2))
+        if(!(family == {{{ cDefine('AF_INET') }}} || family == 2 || family == {{{ cDefine('AF_INET6')}}}))
         {
             ___setErrNo(ERRNO_CODES.EAFNOSUPPORT);
             return -1;
         }
+        var v6 = (family == {{{ cDefine('AF_INET6')}}})
 
         var stream = type == {{{ cDefine('SOCK_STREAM') }}};
         //var dgram = type == {{{ cDefine('SOCK_DGRAM') }}};
@@ -229,6 +272,7 @@ mergeInto(LibraryManager.library, {
         try{
          if(stream){
           fd = FS.createFileHandle({
+            addrlen : v6 ? NodeSockets.sockaddr_in6_layout.__size__ : NodeSockets.sockaddr_in_layout.__size__ ,
             connected: false,
             stream: true,
             socket: true, //real socket will be created when bind() or connect() is called 
@@ -237,10 +281,11 @@ mergeInto(LibraryManager.library, {
           });
          }else if(dgram){
           fd = FS.createFileHandle({
+            addrlen : v6 ? NodeSockets.sockaddr_in6_layout.__size__ : NodeSockets.sockaddr_in_layout.__size__ ,
             connected: false,
             stream: false,
             dgram: true,
-            socket: new NodeSockets.DGRAM().createSocket('udp4'),
+            socket: new NodeSockets.DGRAM().createSocket(v6?'udp6':'udp4'),
             inQueue: []
           });
          }else{
@@ -259,7 +304,7 @@ mergeInto(LibraryManager.library, {
    /*
     *   http://pubs.opengroup.org/onlinepubs/009695399/functions/connect.html
     */
-    connect__deps: ['$NodeSockets', '_inet_ntop_raw', 'htons', '__setErrNo', '$ERRNO_CODES'],
+    connect__deps: ['$NodeSockets', 'htons', '__setErrNo', '$ERRNO_CODES'],
     connect: function(fd, addr, addrlen) {
         if(typeof fd == 'number' && (fd > 64 || fd < 1) ){
             ___setErrNo(ERRNO_CODES.EBADF); return -1;
@@ -292,9 +337,20 @@ mergeInto(LibraryManager.library, {
 
         info.connected = true;
 
-        info.addr = getValue(addr + NodeSockets.sockaddr_in_layout.sin_addr, 'i32');
-        info.port = _htons(getValue(addr + NodeSockets.sockaddr_in_layout.sin_port, 'i16'));
-        info.host = __inet_ntop_raw(info.addr);
+        assert( info.addrlen === addrlen );
+        switch(addrlen){
+            case NodeSockets.sockaddr_in_layout.__size__:
+                info.addr = getValue(addr + NodeSockets.sockaddr_in_layout.sin_addr, 'i32');
+                info.port = _htons(getValue(addr + NodeSockets.sockaddr_in_layout.sin_port, 'i16'));
+                info.host = NodeSockets.inet_ntoa_raw(info.addr);
+                break;
+            case NodeSockets.sockaddr_in6_layout.__size__:
+                info.addr = new Uint16Array(8);
+                info.addr.set(HEAPU16.subarray((addr+NodeSockets.sockaddr_in6_layout.sin6_addr)>>1,(addr+NodeSockets.sockaddr_in6_layout.sin6_addr+16)>>1));
+                info.port = _htons(getValue(addr + NodeSockets.sockaddr_in6_layout.sin_port, 'i16'));
+                info.host = __inet_ntop_raw(info.addr);//fix
+                break;
+        }
 
         if(!info.stream) return 0;
 
@@ -386,11 +442,13 @@ mergeInto(LibraryManager.library, {
         if (!info || !info.socket) {
             ___setErrNo(ERRNO_CODES.ENOTSOCK); return -1;
         }
+
         // if we are not connected, use the address info in the message
+        var name = {{{ makeGetValue('msg', 'NodeSockets.msghdr_layout.msg_name', '*') }}};
+        var namelen = {{{ makeGetValue('msg', 'NodeSockets.msghdr_layout.msg_namelen', 'i32') }}};
         if (!info.connected) {
-          var name = {{{ makeGetValue('msg', 'NodeSockets.msghdr_layout.msg_name', '*') }}};
           assert(name, 'sendmsg on non-connected socket, and no name/address in the message');
-          if(info.stream) _connect(fd, name, {{{ makeGetValue('msg', 'NodeSockets.msghdr_layout.msg_namelen', 'i32') }}});
+          if(info.stream) _connect(fd, name, namelen);
         }
         var iov = {{{ makeGetValue('msg', 'NodeSockets.msghdr_layout.msg_iov', 'i8*') }}};
         var num = {{{ makeGetValue('msg', 'NodeSockets.msghdr_layout.msg_iovlen', 'i32') }}};
@@ -413,8 +471,22 @@ mergeInto(LibraryManager.library, {
           buffer.set(HEAPU8.subarray(currBuf, currBuf+currNum), ret);
           ret += currNum;
         }
-        info.sender(buffer,__inet_ntop_raw( getValue(name+NodeSockets.sockaddr_in_layout.sin_addr,'i32')),
-                _htons(getValue(name+NodeSockets.sockaddr_in_layout.sin_port,'i16'))); // send all the iovs as a single message
+        assert( info.addrlen === namelen );
+        var addr,port,host;
+        switch(namelen){
+            case NodeSockets.sockaddr_in_layout.__size__:
+                addr = getValue(name + NodeSockets.sockaddr_in_layout.sin_addr, 'i32');
+                port = _htons(getValue(name + NodeSockets.sockaddr_in_layout.sin_port, 'i16'));
+                host = NodeSockets.inet_ntoa_raw(addr);
+                break;
+            case NodeSockets.sockaddr_in6_layout.__size__:
+                addr = new Uint16Array(8);
+                addr.set(HEAPU16.subarray((name+NodeSockets.sockaddr_in6_layout.sin6_addr)>>1,(name+NodeSockets.sockaddr_in6_layout.sin6_addr+16)>>1));
+                port = _htons(getValue(name + NodeSockets.sockaddr_in6_layout.sin_port, 'i16'));
+                host = __inet_ntop_raw(addr);//fix
+                break;
+        }
+        info.sender(buffer,host,port); // send all the iovs as a single message
         return ret;
     },
     recvmsg__deps: ['$NodeSockets', 'connect', 'recv', '__setErrNo', '$ERRNO_CODES', 'htons'],
@@ -433,15 +505,23 @@ mergeInto(LibraryManager.library, {
         Module.print('recvmsg bytes: ' + bytes);
 #endif
         var name = {{{ makeGetValue('msg', 'NodeSockets.msghdr_layout.msg_name', '*') }}};
-        
-        // write source
-        if(info.connected){
-            {{{ makeSetValue('name', 'NodeSockets.sockaddr_in_layout.sin_addr', 'info.addr', 'i32') }}};
-            {{{ makeSetValue('name', 'NodeSockets.sockaddr_in_layout.sin_port', '_htons(info.port)', 'i16') }}};
-        }else{
-            //assuming a dgram.. (howabout a tcp socket from accept() ?...)
-            {{{ makeSetValue('name', 'NodeSockets.sockaddr_in_layout.sin_addr', 'buffer.from.addr', 'i32') }}};
-            {{{ makeSetValue('name', 'NodeSockets.sockaddr_in_layout.sin_port', '_htons(buffer.from.port)', 'i16') }}};
+        var namelen = {{{ makeGetValue('msg', 'NodeSockets.msghdr_layout.msg_namelen', 'i32') }}};
+        assert( info.addrlen === namelen );
+        switch(namelen){
+            case NodeSockets.sockaddr_in_layout.__size__:
+                // write source
+                if(info.connected){
+                    {{{ makeSetValue('name', 'NodeSockets.sockaddr_in_layout.sin_addr', 'info.addr', 'i32') }}};
+                    {{{ makeSetValue('name', 'NodeSockets.sockaddr_in_layout.sin_port', '_htons(info.port)', 'i16') }}};
+                }else{
+                    //assuming a dgram.. (howabout a tcp socket from accept() ?...)
+                    {{{ makeSetValue('name', 'NodeSockets.sockaddr_in_layout.sin_addr', 'buffer.from.addr', 'i32') }}};
+                    {{{ makeSetValue('name', 'NodeSockets.sockaddr_in_layout.sin_port', '_htons(buffer.from.port)', 'i16') }}};
+                }
+                break;
+            case NodeSockets.sockaddr_in6_layout.__size__:
+                    //todo...ipv6 ccall('inet_pton',...) set the address
+                    break;
         }
         
         // write data
@@ -489,9 +569,17 @@ mergeInto(LibraryManager.library, {
         }
         var buffer = info.inQueue.shift();
         if(addr){
-            //assuming udp socket..
-            {{{ makeSetValue('addr', 'NodeSockets.sockaddr_in_layout.sin_addr', 'buffer.from.addr', 'i32') }}};
-            {{{ makeSetValue('addr', 'NodeSockets.sockaddr_in_layout.sin_port', '_htons(buffer.from.port)', 'i16') }}};
+            assert( info.addrlen === addrlen );
+            switch(addrlen){
+                case NodeSockets.sockaddr_in_layout.__size__:
+                    {{{ makeSetValue('addr', 'NodeSockets.sockaddr_in_layout.sin_addr', 'buffer.from.addr', 'i32') }}};
+                    {{{ makeSetValue('addr', 'NodeSockets.sockaddr_in_layout.sin_port', '_htons(buffer.from.port)', 'i16') }}};
+                    break;
+                case NodeSockets.sockaddr_in6_layout.__size__:
+                    //todo: set ipv6 addrress using ccall('inet_pton'....)
+                    {{{ makeSetValue('addr', 'NodeSockets.sockaddr_in_layout.sin6_port', '_htons(buffer.from.port)', 'i16') }}};
+                    break;
+            }
         }
 #if SOCKET_DEBUG
         Module.print('recv: ' + [Array.prototype.slice.call(buffer)]);
@@ -557,9 +645,19 @@ mergeInto(LibraryManager.library, {
         
         try{
           if(addr){
-            info.local_addr = getValue(addr + NodeSockets.sockaddr_in_layout.sin_addr, 'i32');
-            info.local_port = _htons(getValue(addr + NodeSockets.sockaddr_in_layout.sin_port, 'i16'));
-            info.local_host = __inet_ntop_raw(info.local_addr);
+            assert(info.addrlen === addrlen);
+            switch(addrlen){
+                case NodeSockets.sockaddr_in_layout.__size__:
+                    info.local_addr = getValue(addr + NodeSockets.sockaddr_in_layout.sin_addr, 'i32');
+                    info.local_port = _htons(getValue(addr + NodeSockets.sockaddr_in_layout.sin_port, 'i16'));
+                    info.local_host = NodeSockets.inet_ntoa_raw(info.local_addr);
+                    break;
+                case NodeSockets.sockaddr_in6_layout.__size__:
+                    //todo: ipv6 .. __inet_ntop_raw..
+                    assert(false,'bind(): IPv6 support not yet completed');
+                    break;
+            }
+
           }
 
           if(info.dgram){
@@ -578,7 +676,7 @@ mergeInto(LibraryManager.library, {
 #endif                    
                     //console.log("received:",msg);
                     buf.from = {
-                        addr: NodeSockets.inet_pton_raw(rinfo.address),
+                        addr: NodeSockets.inet_aton_raw(rinfo.address),
                         port: rinfo.port
                     }
                     info.inQueue.push(buf);
@@ -649,7 +747,7 @@ mergeInto(LibraryManager.library, {
         var conn = FS.streams[newfd];
         conn.socket = info.connQueue.shift();
         
-        conn.addr = NodeSockets.inet_pton_raw(conn.socket.remoteAddress);
+        conn.addr = NodeSockets.inet_aton_raw(conn.socket.remoteAddress);
         conn.port = _htons(conn.socket.remotePort);
         conn.host = conn.socket.remoteAddress;
                 

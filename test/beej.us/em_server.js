@@ -513,7 +513,7 @@ function setValue(ptr, value, type, noSafe) {
       case 'i8': HEAP8[(ptr)]=value; break;
       case 'i16': HEAP16[((ptr)>>1)]=value; break;
       case 'i32': HEAP32[((ptr)>>2)]=value; break;
-      case 'i64': (tempI64 = [value>>>0,Math.min(Math.floor((value)/(+(4294967296))), (+(4294967295)))>>>0],HEAP32[((ptr)>>2)]=tempI64[0],HEAP32[(((ptr)+(4))>>2)]=tempI64[1]); break;
+      case 'i64': (tempI64 = [value>>>0,((Math.min((+(Math.floor((value)/(+(4294967296))))), (+(4294967295))))|0)>>>0],HEAP32[((ptr)>>2)]=tempI64[0],HEAP32[(((ptr)+(4))>>2)]=tempI64[1]); break;
       case 'float': HEAPF32[((ptr)>>2)]=value; break;
       case 'double': HEAPF64[((ptr)>>3)]=value; break;
       default: abort('invalid type for setValue: ' + type);
@@ -902,10 +902,10 @@ function copyTempDouble(ptr) {
     }
   var ERRNO_CODES={EPERM:1,ENOENT:2,ESRCH:3,EINTR:4,EIO:5,ENXIO:6,E2BIG:7,ENOEXEC:8,EBADF:9,ECHILD:10,EAGAIN:11,EWOULDBLOCK:11,ENOMEM:12,EACCES:13,EFAULT:14,ENOTBLK:15,EBUSY:16,EEXIST:17,EXDEV:18,ENODEV:19,ENOTDIR:20,EISDIR:21,EINVAL:22,ENFILE:23,EMFILE:24,ENOTTY:25,ETXTBSY:26,EFBIG:27,ENOSPC:28,ESPIPE:29,EROFS:30,EMLINK:31,EPIPE:32,EDOM:33,ERANGE:34,ENOMSG:35,EIDRM:36,ECHRNG:37,EL2NSYNC:38,EL3HLT:39,EL3RST:40,ELNRNG:41,EUNATCH:42,ENOCSI:43,EL2HLT:44,EDEADLK:45,ENOLCK:46,EBADE:50,EBADR:51,EXFULL:52,ENOANO:53,EBADRQC:54,EBADSLT:55,EDEADLOCK:56,EBFONT:57,ENOSTR:60,ENODATA:61,ETIME:62,ENOSR:63,ENONET:64,ENOPKG:65,EREMOTE:66,ENOLINK:67,EADV:68,ESRMNT:69,ECOMM:70,EPROTO:71,EMULTIHOP:74,ELBIN:75,EDOTDOT:76,EBADMSG:77,EFTYPE:79,ENOTUNIQ:80,EBADFD:81,EREMCHG:82,ELIBACC:83,ELIBBAD:84,ELIBSCN:85,ELIBMAX:86,ELIBEXEC:87,ENOSYS:88,ENMFILE:89,ENOTEMPTY:90,ENAMETOOLONG:91,ELOOP:92,EOPNOTSUPP:95,EPFNOSUPPORT:96,ECONNRESET:104,ENOBUFS:105,EAFNOSUPPORT:106,EPROTOTYPE:107,ENOTSOCK:108,ENOPROTOOPT:109,ESHUTDOWN:110,ECONNREFUSED:111,EADDRINUSE:112,ECONNABORTED:113,ENETUNREACH:114,ENETDOWN:115,ETIMEDOUT:116,EHOSTDOWN:117,EHOSTUNREACH:118,EINPROGRESS:119,EALREADY:120,EDESTADDRREQ:121,EMSGSIZE:122,EPROTONOSUPPORT:123,ESOCKTNOSUPPORT:124,EADDRNOTAVAIL:125,ENETRESET:126,EISCONN:127,ENOTCONN:128,ETOOMANYREFS:129,EPROCLIM:130,EUSERS:131,EDQUOT:132,ESTALE:133,ENOTSUP:134,ENOMEDIUM:135,ENOSHARE:136,ECASECLASH:137,EILSEQ:138,EOVERFLOW:139,ECANCELED:140,ENOTRECOVERABLE:141,EOWNERDEAD:142,ESTRPIPE:143};
   function _inet_addr(ptr) {
-      var b = Pointer_stringify(ptr).split(".");
-      if (b.length !== 4) return -1; // we return -1 for error, and otherwise a uint32. this helps inet_pton differentiate
-      return (Number(b[0]) | (Number(b[1]) << 8) | (Number(b[2]) << 16) | (Number(b[3]) << 24)) >>> 0;
-    }function _inet_pton(af, src, dst) {
+       var b = Pointer_stringify(ptr).split(".");
+       if (b.length !== 4) return -1; // we return -1 for error, and otherwise a uint32. this helps inet_pton differentiate
+       return (Number(b[0]) | (Number(b[1]) << 8) | (Number(b[2]) << 16) | (Number(b[3]) << 24)) >>> 0;
+     }function _inet_pton(af, src, dst) {
       // int af, const char *src, void *dst
       if ((af ^ 1) !==  0) { ___setErrNo(ERRNO_CODES.EAFNOSUPPORT); return -1; }
       var ret = _inet_addr(src);
@@ -915,18 +915,27 @@ function copyTempDouble(ptr) {
     }
   function _htons(value) {
       return ((value & 0xff) << 8) + ((value & 0xff00) >> 8);
-    }
-  var NodeSockets={sockaddr_in_layout:{__size__:20,sin_family:0,sin_port:4,sin_addr:8,sin_zero:12,sin_zero_b:16},msghdr_layout:{__size__:28,msg_name:0,msg_namelen:4,msg_iov:8,msg_iovlen:12,msg_control:16,msg_controllen:20,msg_flags:24},inet_pton_raw:function (str) {
+     }
+  var NodeSockets={sockaddr_in_layout:{__size__:20,sin_family:0,sin_port:4,sin_addr:8,sin_zero:12,sin_zero_b:16},sockaddr_in6_layout:{__size__:28,sin6_family:0,sin6_port:2,sin6_flowinfo:4,sin6_addr:8,sin6_scopeid:24},msghdr_layout:{__size__:28,msg_name:0,msg_namelen:4,msg_iov:8,msg_iovlen:12,msg_control:16,msg_controllen:20,msg_flags:24},inet_aton_raw:function (str) {
           var b = str.split(".");
           return (Number(b[0]) | (Number(b[1]) << 8) | (Number(b[2]) << 16) | (Number(b[3]) << 24)) >>> 0;
+      },inet_ntoa_raw:function (addr) {
+          return (addr & 0xff) + '.' + ((addr >> 8) & 0xff) + '.' + ((addr >> 16) & 0xff) + '.' + ((addr >> 24) & 0xff)
+      },DGRAM:function (){
+          if(typeof require !== 'undefined') return require("dgram");//node or browserified
+          assert(false);        
+      },NET:function (){
+          if(typeof require !== 'undefined') return require("net");//node or browserified
+          assert(false);
       }};function _socket(family, type, protocol) {
           var fd;
           //if(!(family == 1 || family == 2))
-          if(!(family == 1 || family == 2))
+          if(!(family == 1 || family == 2 || family == 6))
           {
               ___setErrNo(ERRNO_CODES.EAFNOSUPPORT);
               return -1;
           }
+          var v6 = (family == 6)
           var stream = type == 200;
           //var dgram = type == 20;
           var dgram = type == 20;
@@ -938,6 +947,7 @@ function copyTempDouble(ptr) {
           try{
            if(stream){
             fd = FS.createFileHandle({
+              addrlen : v6 ? NodeSockets.sockaddr_in6_layout.__size__ : NodeSockets.sockaddr_in_layout.__size__ ,
               connected: false,
               stream: true,
               socket: true, //real socket will be created when bind() or connect() is called 
@@ -946,10 +956,11 @@ function copyTempDouble(ptr) {
             });
            }else if(dgram){
             fd = FS.createFileHandle({
+              addrlen : v6 ? NodeSockets.sockaddr_in6_layout.__size__ : NodeSockets.sockaddr_in_layout.__size__ ,
               connected: false,
               stream: false,
               dgram: true,
-              socket: new require("dgram").createSocket('udp4'),
+              socket: new NodeSockets.DGRAM().createSocket(v6?'udp6':'udp4'),
               inQueue: []
             });
            }else{
@@ -1582,9 +1593,7 @@ function copyTempDouble(ptr) {
       var errnum = HEAP32[((___errno_location())>>2)];
       _puts(_strerror(errnum));
     }
-  function __inet_ntop_raw(addr) {
-      return (addr & 0xff) + '.' + ((addr >> 8) & 0xff) + '.' + ((addr >> 16) & 0xff) + '.' + ((addr >> 24) & 0xff)
-    }function _connect(fd, addr, addrlen) {
+  function _connect(fd, addr, addrlen) {
           if(typeof fd == 'number' && (fd > 64 || fd < 1) ){
               ___setErrNo(ERRNO_CODES.EBADF); return -1;
           }
@@ -1611,9 +1620,20 @@ function copyTempDouble(ptr) {
               ___setErrNo(ERRNO_CODES.EOPNOTSUPP); return -1;
           }
           info.connected = true;
-          info.addr = getValue(addr + NodeSockets.sockaddr_in_layout.sin_addr, 'i32');
-          info.port = _htons(getValue(addr + NodeSockets.sockaddr_in_layout.sin_port, 'i16'));
-          info.host = __inet_ntop_raw(info.addr);
+          assert( info.addrlen === addrlen );
+          switch(addrlen){
+              case NodeSockets.sockaddr_in_layout.__size__:
+                  info.addr = getValue(addr + NodeSockets.sockaddr_in_layout.sin_addr, 'i32');
+                  info.port = _htons(getValue(addr + NodeSockets.sockaddr_in_layout.sin_port, 'i16'));
+                  info.host = NodeSockets.inet_ntoa_raw(info.addr);
+                  break;
+              case NodeSockets.sockaddr_in6_layout.__size__:
+                  info.addr = new Uint16Array(8);
+                  info.addr.set(HEAPU16.subarray((addr+NodeSockets.sockaddr_in6_layout.sin6_addr)>>1,(addr+NodeSockets.sockaddr_in6_layout.sin6_addr+16)>>1));
+                  info.port = _htons(getValue(addr + NodeSockets.sockaddr_in6_layout.sin_port, 'i16'));
+                  info.host = __inet_ntop_raw(info.addr);//fix
+                  break;
+          }
           if(!info.stream) return 0;
           (function(info){
               var intervalling = false, interval;
@@ -1650,7 +1670,7 @@ function copyTempDouble(ptr) {
                   }
               }
               try{
-                info.socket = new require("net").connect({host:info.host,port:info.port,localAddress:info.local_host},function(){
+                info.socket = new NodeSockets.NET().connect({host:info.host,port:info.port,localAddress:info.local_host},function(){
                   info.CONNECTING = false;
                   info.ESTABLISHED = true;
                 });
@@ -1683,9 +1703,18 @@ function copyTempDouble(ptr) {
           }
           try{
             if(addr){
-              info.local_addr = getValue(addr + NodeSockets.sockaddr_in_layout.sin_addr, 'i32');
-              info.local_port = _htons(getValue(addr + NodeSockets.sockaddr_in_layout.sin_port, 'i16'));
-              info.local_host = __inet_ntop_raw(info.local_addr);
+              assert(info.addrlen === addrlen);
+              switch(addrlen){
+                  case NodeSockets.sockaddr_in_layout.__size__:
+                      info.local_addr = getValue(addr + NodeSockets.sockaddr_in_layout.sin_addr, 'i32');
+                      info.local_port = _htons(getValue(addr + NodeSockets.sockaddr_in_layout.sin_port, 'i16'));
+                      info.local_host = NodeSockets.inet_ntoa_raw(info.local_addr);
+                      break;
+                  case NodeSockets.sockaddr_in6_layout.__size__:
+                      //todo: ipv6 .. __inet_ntop_raw..
+                      assert(false,'bind(): IPv6 support not yet completed');
+                      break;
+              }
             }
             if(info.dgram){
                   //if already bound return with error
@@ -1699,7 +1728,7 @@ function copyTempDouble(ptr) {
                       var buf = new Uint8Array(msg);
                       //console.log("received:",msg);
                       buf.from = {
-                          addr: NodeSockets.inet_pton_raw(rinfo.address),
+                          addr: NodeSockets.inet_aton_raw(rinfo.address),
                           port: rinfo.port
                       }
                       info.inQueue.push(buf);
@@ -1744,7 +1773,7 @@ function copyTempDouble(ptr) {
               ___setErrNo(ERRNO_CODES.ENOTSOCK); return -1;
           }
           assert(info.stream);
-          info.socket = require("net").createServer();
+          info.socket = NodeSockets.NET().createServer();
           info.server = info.socket;//mark it as a listening socket
           info.connQueue = [];
           info.socket.listen(info.local_port||0,info.local_host,backlog,function(){});
@@ -1835,7 +1864,7 @@ function copyTempDouble(ptr) {
           }
           var conn = FS.streams[newfd];
           conn.socket = info.connQueue.shift();
-          conn.addr = NodeSockets.inet_pton_raw(conn.socket.remoteAddress);
+          conn.addr = NodeSockets.inet_aton_raw(conn.socket.remoteAddress);
           conn.port = _htons(conn.socket.remotePort);
           conn.host = conn.socket.remoteAddress;
           if (addr) {
@@ -1893,7 +1922,9 @@ function copyTempDouble(ptr) {
           })(conn);
           return newfd;
       }
-  function _inet_ntop(af, src, dst, size) {
+  function __inet_ntop_raw(addr) {
+      return (addr & 0xff) + '.' + ((addr >> 8) & 0xff) + '.' + ((addr >> 16) & 0xff) + '.' + ((addr >> 24) & 0xff)
+    }function _inet_ntop(af, src, dst, size) {
       var addr = getValue(src, 'i32');
       var str = __inet_ntop_raw(addr);
       writeStringToMemory(str.substr(0, size), dst);
@@ -2335,7 +2366,8 @@ function copyTempDouble(ptr) {
             }
           }
         }},isFullScreen:false,pointerLock:false,moduleContextCreatedCallbacks:[],workers:[],init:function () {
-        if (Browser.initted) return;
+        if (!Module["preloadPlugins"]) Module["preloadPlugins"] = []; // needs to exist even in workers
+        if (Browser.initted || ENVIRONMENT_IS_WORKER) return;
         Browser.initted = true;
         try {
           new Blob();
@@ -2364,7 +2396,6 @@ function copyTempDouble(ptr) {
             'mp3': 'audio/mpeg'
           }[name.substr(name.lastIndexOf('.')+1)];
         }
-        if (!Module["preloadPlugins"]) Module["preloadPlugins"] = [];
         var imagePlugin = {};
         imagePlugin['canHandle'] = function(name) {
           return !Module.noImageDecoding && /\.(jpg|jpeg|png|bmp)$/.exec(name);
@@ -2741,13 +2772,13 @@ function asmPrintFloat(x, y) {
   Module.print('float ' + x + ',' + y);// + ' ' + new Error().stack);
 }
 // EMSCRIPTEN_START_ASM
-var asm=(function(global,env,buffer){"use asm";var a=new global.Int8Array(buffer);var b=new global.Int16Array(buffer);var c=new global.Int32Array(buffer);var d=new global.Uint8Array(buffer);var e=new global.Uint16Array(buffer);var f=new global.Uint32Array(buffer);var g=new global.Float32Array(buffer);var h=new global.Float64Array(buffer);var i=env.STACKTOP|0;var j=env.STACK_MAX|0;var k=env.tempDoublePtr|0;var l=env.ABORT|0;var m=+env.NaN;var n=+env.Infinity;var o=0;var p=0;var q=0;var r=0;var s=0,t=0,u=0,v=0,w=0.0,x=0,y=0,z=0,A=0.0;var B=0;var C=0;var D=0;var E=0;var F=0;var G=0;var H=0;var I=0;var J=0;var K=0;var L=global.Math.floor;var M=global.Math.abs;var N=global.Math.sqrt;var O=global.Math.pow;var P=global.Math.cos;var Q=global.Math.sin;var R=global.Math.tan;var S=global.Math.acos;var T=global.Math.asin;var U=global.Math.atan;var V=global.Math.atan2;var W=global.Math.exp;var X=global.Math.log;var Y=global.Math.ceil;var Z=global.Math.imul;var _=env.abort;var $=env.assert;var aa=env.asmPrintInt;var ab=env.asmPrintFloat;var ac=env.copyTempDouble;var ad=env.copyTempFloat;var ae=env.min;var af=env.invoke_ii;var ag=env.invoke_v;var ah=env.invoke_iii;var ai=env.invoke_vi;var aj=env._malloc;var ak=env.__reallyNegative;var al=env._accept;var am=env._inet_pton;var an=env._fprintf;var ao=env._connect;var ap=env.__inet_ntop_raw;var aq=env._printf;var ar=env._close;var as=env._htons;var at=env._fputc;var au=env._puts;var av=env.___setErrNo;var aw=env._fwrite;var ax=env._inet_addr;var ay=env._send;var az=env._write;var aA=env._fputs;var aB=env._listen;var aC=env._emscripten_set_main_loop;var aD=env._inet_ntop;var aE=env.__formatString;var aF=env._free;var aG=env._pwrite;var aH=env._perror;var aI=env._socket;var aJ=env._strerror_r;var aK=env._bind;var aL=env.___errno_location;var aM=env._strerror;
+var asm=(function(global,env,buffer){"use asm";var a=new global.Int8Array(buffer);var b=new global.Int16Array(buffer);var c=new global.Int32Array(buffer);var d=new global.Uint8Array(buffer);var e=new global.Uint16Array(buffer);var f=new global.Uint32Array(buffer);var g=new global.Float32Array(buffer);var h=new global.Float64Array(buffer);var i=env.STACKTOP|0;var j=env.STACK_MAX|0;var k=env.tempDoublePtr|0;var l=env.ABORT|0;var m=+env.NaN;var n=+env.Infinity;var o=0;var p=0;var q=0;var r=0;var s=0,t=0,u=0,v=0,w=0.0,x=0,y=0,z=0,A=0.0;var B=0;var C=0;var D=0;var E=0;var F=0;var G=0;var H=0;var I=0;var J=0;var K=0;var L=global.Math.floor;var M=global.Math.abs;var N=global.Math.sqrt;var O=global.Math.pow;var P=global.Math.cos;var Q=global.Math.sin;var R=global.Math.tan;var S=global.Math.acos;var T=global.Math.asin;var U=global.Math.atan;var V=global.Math.atan2;var W=global.Math.exp;var X=global.Math.log;var Y=global.Math.ceil;var Z=global.Math.imul;var _=env.abort;var $=env.assert;var aa=env.asmPrintInt;var ab=env.asmPrintFloat;var ac=env.min;var ad=env.invoke_ii;var ae=env.invoke_v;var af=env.invoke_iii;var ag=env.invoke_vi;var ah=env._malloc;var ai=env.__reallyNegative;var aj=env._accept;var ak=env._inet_pton;var al=env._fprintf;var am=env._connect;var an=env.__inet_ntop_raw;var ao=env._printf;var ap=env._close;var aq=env._htons;var ar=env._fputc;var as=env._puts;var at=env.___setErrNo;var au=env._fwrite;var av=env._inet_addr;var aw=env._send;var ax=env._write;var ay=env._fputs;var az=env._listen;var aA=env._emscripten_set_main_loop;var aB=env._inet_ntop;var aC=env.__formatString;var aD=env._free;var aE=env._pwrite;var aF=env._perror;var aG=env._socket;var aH=env._strerror_r;var aI=env._bind;var aJ=env.___errno_location;var aK=env._strerror;
 // EMSCRIPTEN_START_FUNCS
-function aR(a){a=a|0;var b=0;b=i;i=i+a|0;i=i+7>>3<<3;return b|0}function aS(){return i|0}function aT(a){a=a|0;i=a}function aU(a,b){a=a|0;b=b|0;if((o|0)==0){o=a;p=b}}function aV(a){a=a|0;B=a}function aW(a){a=a|0;C=a}function aX(a){a=a|0;D=a}function aY(a){a=a|0;E=a}function aZ(a){a=a|0;F=a}function a_(a){a=a|0;G=a}function a$(a){a=a|0;H=a}function a0(a){a=a|0;I=a}function a1(a){a=a|0;J=a}function a2(a){a=a|0;K=a}function a3(a,d){a=a|0;d=d|0;var e=0,f=0,g=0;d=i;i=i+24|0;a=d|0;c[a>>2]=1;am(1,104,a+8|0);b[a+4>>1]=as(3490)|0;e=aI(1,200,0)|0;c[2]=e;if((e|0)==-1){aH(88);f=1;i=d;return f|0}g=(aK(e|0,a|0,20)|0)==-1;a=c[2]|0;if(g){ar(a|0);aH(72);f=1;i=d;return f|0}if((aB(a|0,10)|0)==-1){aH(64);f=1;i=d;return f|0}else{aC(2,2,0);f=0;i=d;return f|0}return 0}function a4(){var a=0,b=0,d=0,e=0;a=i;i=i+288|0;b=a|0;d=a+8|0;c[b>>2]=20;e=al(c[2]|0,d|0,b|0)|0;if((e|0)==-1){i=a;return}b=a+32|0;aD(c[d>>2]|0,d+8|0,b|0,256);aq(32,(s=i,i=i+8|0,c[s>>2]=b,s)|0);ay(e|0,16,13,0);ar(e|0);i=a;return}function a5(b){b=b|0;var c=0;c=b;while(a[c]|0){c=c+1|0}return c-b|0}function a6(b,d,e){b=b|0;d=d|0;e=e|0;var f=0;f=b|0;if((b&3)==(d&3)){while(b&3){if((e|0)==0)return f|0;a[b]=a[d]|0;b=b+1|0;d=d+1|0;e=e-1|0}while((e|0)>=4){c[b>>2]=c[d>>2];b=b+4|0;d=d+4|0;e=e-4|0}}while((e|0)>0){a[b]=a[d]|0;b=b+1|0;d=d+1|0;e=e-1|0}return f|0}function a7(b,d,e){b=b|0;d=d|0;e=e|0;var f=0,g=0,h=0;f=b+e|0;if((e|0)>=20){d=d&255;e=b&3;g=d|d<<8|d<<16|d<<24;h=f&~3;if(e){e=b+4-e|0;while((b|0)<(e|0)){a[b]=d;b=b+1|0}}while((b|0)<(h|0)){c[b>>2]=g;b=b+4|0}}while((b|0)<(f|0)){a[b]=d;b=b+1|0}}function a8(a,b){a=a|0;b=b|0;return aN[a&1](b|0)|0}function a9(a){a=a|0;aO[a&3]()}function ba(a,b,c){a=a|0;b=b|0;c=c|0;return aP[a&1](b|0,c|0)|0}function bb(a,b){a=a|0;b=b|0;aQ[a&1](b|0)}function bc(a){a=a|0;_(0);return 0}function bd(){_(1)}function be(a,b){a=a|0;b=b|0;_(2);return 0}function bf(a){a=a|0;_(3)}
+function aP(a){a=a|0;var b=0;b=i;i=i+a|0;i=i+7>>3<<3;return b|0}function aQ(){return i|0}function aR(a){a=a|0;i=a}function aS(a,b){a=a|0;b=b|0;if((o|0)==0){o=a;p=b}}function aT(b){b=b|0;a[k]=a[b];a[k+1|0]=a[b+1|0];a[k+2|0]=a[b+2|0];a[k+3|0]=a[b+3|0]}function aU(b){b=b|0;a[k]=a[b];a[k+1|0]=a[b+1|0];a[k+2|0]=a[b+2|0];a[k+3|0]=a[b+3|0];a[k+4|0]=a[b+4|0];a[k+5|0]=a[b+5|0];a[k+6|0]=a[b+6|0];a[k+7|0]=a[b+7|0]}function aV(a){a=a|0;B=a}function aW(a){a=a|0;C=a}function aX(a){a=a|0;D=a}function aY(a){a=a|0;E=a}function aZ(a){a=a|0;F=a}function a_(a){a=a|0;G=a}function a$(a){a=a|0;H=a}function a0(a){a=a|0;I=a}function a1(a){a=a|0;J=a}function a2(a){a=a|0;K=a}function a3(a,d){a=a|0;d=d|0;var e=0,f=0,g=0;d=i;i=i+24|0;a=d|0;c[a>>2]=1;ak(1,104,a+8|0)|0;b[a+4>>1]=aq(3490)|0;e=aG(1,200,0)|0;c[2]=e;if((e|0)==-1){aF(88);f=1;i=d;return f|0}g=(aI(e|0,a|0,20)|0)==-1;a=c[2]|0;if(g){ap(a|0)|0;aF(72);f=1;i=d;return f|0}if((az(a|0,10)|0)==-1){aF(64);f=1;i=d;return f|0}else{aA(2,2,0);f=0;i=d;return f|0}return 0}function a4(){var a=0,b=0,d=0,e=0;a=i;i=i+288|0;b=a|0;d=a+8|0;c[b>>2]=20;e=aj(c[2]|0,d|0,b|0)|0;if((e|0)==-1){i=a;return}b=a+32|0;aB(c[d>>2]|0,d+8|0,b|0,256)|0;ao(32,(s=i,i=i+8|0,c[s>>2]=b,s)|0)|0;aw(e|0,16,13,0)|0;ap(e|0)|0;i=a;return}function a5(b){b=b|0;var c=0;c=b;while(a[c]|0){c=c+1|0}return c-b|0}function a6(b,d,e){b=b|0;d=d|0;e=e|0;var f=0;f=b|0;if((b&3)==(d&3)){while(b&3){if((e|0)==0)return f|0;a[b]=a[d]|0;b=b+1|0;d=d+1|0;e=e-1|0}while((e|0)>=4){c[b>>2]=c[d>>2];b=b+4|0;d=d+4|0;e=e-4|0}}while((e|0)>0){a[b]=a[d]|0;b=b+1|0;d=d+1|0;e=e-1|0}return f|0}function a7(b,d,e){b=b|0;d=d|0;e=e|0;var f=0,g=0,h=0;f=b+e|0;if((e|0)>=20){d=d&255;e=b&3;g=d|d<<8|d<<16|d<<24;h=f&~3;if(e){e=b+4-e|0;while((b|0)<(e|0)){a[b]=d;b=b+1|0}}while((b|0)<(h|0)){c[b>>2]=g;b=b+4|0}}while((b|0)<(f|0)){a[b]=d;b=b+1|0}}function a8(a,b){a=a|0;b=b|0;return aL[a&1](b|0)|0}function a9(a){a=a|0;aM[a&3]()}function ba(a,b,c){a=a|0;b=b|0;c=c|0;return aN[a&1](b|0,c|0)|0}function bb(a,b){a=a|0;b=b|0;aO[a&1](b|0)}function bc(a){a=a|0;_(0);return 0}function bd(){_(1)}function be(a,b){a=a|0;b=b|0;_(2);return 0}function bf(a){a=a|0;_(3)}
 // EMSCRIPTEN_END_FUNCS
-var aN=[bc,bc];var aO=[bd,bd,a4,bd];var aP=[be,be];var aQ=[bf,bf];return{_strlen:a5,_memcpy:a6,_main:a3,_memset:a7,stackAlloc:aR,stackSave:aS,stackRestore:aT,setThrew:aU,setTempRet0:aV,setTempRet1:aW,setTempRet2:aX,setTempRet3:aY,setTempRet4:aZ,setTempRet5:a_,setTempRet6:a$,setTempRet7:a0,setTempRet8:a1,setTempRet9:a2,dynCall_ii:a8,dynCall_v:a9,dynCall_iii:ba,dynCall_vi:bb}})
+var aL=[bc,bc];var aM=[bd,bd,a4,bd];var aN=[be,be];var aO=[bf,bf];return{_strlen:a5,_memcpy:a6,_main:a3,_memset:a7,stackAlloc:aP,stackSave:aQ,stackRestore:aR,setThrew:aS,setTempRet0:aV,setTempRet1:aW,setTempRet2:aX,setTempRet3:aY,setTempRet4:aZ,setTempRet5:a_,setTempRet6:a$,setTempRet7:a0,setTempRet8:a1,setTempRet9:a2,dynCall_ii:a8,dynCall_v:a9,dynCall_iii:ba,dynCall_vi:bb}})
 // EMSCRIPTEN_END_ASM
-({ "Math": Math, "Int8Array": Int8Array, "Int16Array": Int16Array, "Int32Array": Int32Array, "Uint8Array": Uint8Array, "Uint16Array": Uint16Array, "Uint32Array": Uint32Array, "Float32Array": Float32Array, "Float64Array": Float64Array }, { "abort": abort, "assert": assert, "asmPrintInt": asmPrintInt, "asmPrintFloat": asmPrintFloat, "copyTempDouble": copyTempDouble, "copyTempFloat": copyTempFloat, "min": Math_min, "invoke_ii": invoke_ii, "invoke_v": invoke_v, "invoke_iii": invoke_iii, "invoke_vi": invoke_vi, "_malloc": _malloc, "__reallyNegative": __reallyNegative, "_accept": _accept, "_inet_pton": _inet_pton, "_fprintf": _fprintf, "_connect": _connect, "__inet_ntop_raw": __inet_ntop_raw, "_printf": _printf, "_close": _close, "_htons": _htons, "_fputc": _fputc, "_puts": _puts, "___setErrNo": ___setErrNo, "_fwrite": _fwrite, "_inet_addr": _inet_addr, "_send": _send, "_write": _write, "_fputs": _fputs, "_listen": _listen, "_emscripten_set_main_loop": _emscripten_set_main_loop, "_inet_ntop": _inet_ntop, "__formatString": __formatString, "_free": _free, "_pwrite": _pwrite, "_perror": _perror, "_socket": _socket, "_strerror_r": _strerror_r, "_bind": _bind, "___errno_location": ___errno_location, "_strerror": _strerror, "STACKTOP": STACKTOP, "STACK_MAX": STACK_MAX, "tempDoublePtr": tempDoublePtr, "ABORT": ABORT, "NaN": NaN, "Infinity": Infinity }, buffer);
+({ "Math": Math, "Int8Array": Int8Array, "Int16Array": Int16Array, "Int32Array": Int32Array, "Uint8Array": Uint8Array, "Uint16Array": Uint16Array, "Uint32Array": Uint32Array, "Float32Array": Float32Array, "Float64Array": Float64Array }, { "abort": abort, "assert": assert, "asmPrintInt": asmPrintInt, "asmPrintFloat": asmPrintFloat, "min": Math_min, "invoke_ii": invoke_ii, "invoke_v": invoke_v, "invoke_iii": invoke_iii, "invoke_vi": invoke_vi, "_malloc": _malloc, "__reallyNegative": __reallyNegative, "_accept": _accept, "_inet_pton": _inet_pton, "_fprintf": _fprintf, "_connect": _connect, "__inet_ntop_raw": __inet_ntop_raw, "_printf": _printf, "_close": _close, "_htons": _htons, "_fputc": _fputc, "_puts": _puts, "___setErrNo": ___setErrNo, "_fwrite": _fwrite, "_inet_addr": _inet_addr, "_send": _send, "_write": _write, "_fputs": _fputs, "_listen": _listen, "_emscripten_set_main_loop": _emscripten_set_main_loop, "_inet_ntop": _inet_ntop, "__formatString": __formatString, "_free": _free, "_pwrite": _pwrite, "_perror": _perror, "_socket": _socket, "_strerror_r": _strerror_r, "_bind": _bind, "___errno_location": ___errno_location, "_strerror": _strerror, "STACKTOP": STACKTOP, "STACK_MAX": STACK_MAX, "tempDoublePtr": tempDoublePtr, "ABORT": ABORT, "NaN": NaN, "Infinity": Infinity }, buffer);
 var _strlen = Module["_strlen"] = asm["_strlen"];
 var _memcpy = Module["_memcpy"] = asm["_memcpy"];
 var _main = Module["_main"] = asm["_main"];
