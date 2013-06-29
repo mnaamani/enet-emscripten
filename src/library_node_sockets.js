@@ -13,7 +13,7 @@ mergeInto(LibraryManager.library, {
       ['i16', 'sin_zero_b'],
     ]),
     sockaddr_in6_layout: Runtime.generateStructInfo([
-      ['i16', 'sin6_family'],
+      ['i32', 'sin6_family'],
       ['i16', 'sin6_port'],
       ['i32', 'sin6_flowinfo'],
       ['b16', 'sin6_addr'],//<< struct in6_addr
@@ -773,7 +773,7 @@ mergeInto(LibraryManager.library, {
                 case NodeSockets.sockaddr_in6_layout.__size__:
                     NodeSockets.inet_pton_raw(conn.host,addr + NodeSockets.sockaddr_in6_layout.sin6_addr);
                     setValue(addr + NodeSockets.sockaddr_in6_layout.sin6_port, conn.port, 'i16');
-                    setValue(addr + NodeSockets.sockaddr_in6_layout.sin6_family, {{{ cDefine('AF_INET6') }}}, 'i16');
+                    setValue(addr + NodeSockets.sockaddr_in6_layout.sin6_family, {{{ cDefine('AF_INET6') }}}, 'i32');
                     setValue(addrlen, NodeSockets.sockaddr_in6_layout.__size__, 'i32');
                     break;
             }
