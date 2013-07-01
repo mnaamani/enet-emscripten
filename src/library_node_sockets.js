@@ -207,38 +207,6 @@ mergeInto(LibraryManager.library, {
         },
 #endif
    },
-   htonl: function(value) {
-    return ((value & 0xff) << 24) + ((value & 0xff00) << 8) +
-           ((value & 0xff0000) >>> 8) + ((value & 0xff000000) >>> 24);
-   },
-   htons: function(value) {
-    return ((value & 0xff) << 8) + ((value & 0xff00) >> 8);
-   },
-   ntohl: 'htonl',
-   ntohs: 'htons',
-   inet_addr: function(ptr) {
-     var b = Pointer_stringify(ptr).split(".");
-     if (b.length !== 4) return -1; // we return -1 for error, and otherwise a uint32. this helps inet_pton differentiate
-     return (Number(b[0]) | (Number(b[1]) << 8) | (Number(b[2]) << 16) | (Number(b[3]) << 24)) >>> 0;
-   },
-  inet_ntoa__deps: ['$NodeSockets'],
-  inet_ntoa: function(in_addr) {
-    if (!_inet_ntoa.buffer) {
-      _inet_ntoa.buffer = _malloc(1024);
-    }
-    var addr = getValue(in_addr, 'i32');
-    var str = NodeSockets.inet_ntoa_raw(addr);
-    writeStringToMemory(str.substr(0, 1024), _inet_ntoa.buffer);
-    return _inet_ntoa.buffer;
-  },
-
-  inet_aton__deps: ['inet_addr'],
-  inet_aton: function(cp, inp) {
-    var addr = _inet_addr(cp);
-    setValue(inp, addr, 'i32');
-    if (addr < 0) return 0;
-    return 1;
-  },
    close__deps: ['$FS', '__setErrNo', '$ERRNO_CODES'],
    close: function(fildes) {
      // int close(int fildes);

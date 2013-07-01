@@ -9,10 +9,9 @@ inet_ntop.o: ../src/inet_ntop.c
 inet_pton.o: ../src/inet_pton.c
 	$(EMCC) ../src/inet_pton.c -o ../libs/inet_pton.o
 
-nodesockets: inet_ntop.o inet_pton.o
-	$(EMCC) test-new.c ../libs/inet_ntop.o ../libs/inet_pton.o \
-        -lenet -L../libs -I../include -o index-new.js \
-        --js-library ../src/library_node_sockets.js -O2
+nodesockets:
+	$(EMCC) test-new.c -lenet -L../libs -I../include -o index-new.js \
+        --js-library ../src/library_node_sockets.js --js-library ../src/library_inet.js -O2
 
 test_inet1: test_inet4.c test_inet6.c ../src/library_inet.js
 	$(EMCC) test_inet6.c -o test_inet6.js --js-library ../src/library_inet.js
