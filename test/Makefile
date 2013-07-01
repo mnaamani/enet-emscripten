@@ -14,8 +14,13 @@ nodesockets: inet_ntop.o inet_pton.o
         -lenet -L../libs -I../include -o index-new.js \
         --js-library ../src/library_node_sockets.js -O2
 
-test_inet.js: test_inet.c
-	$(EMCC) test_inet.c ../libs/inet_ntop.o ../libs/inet_pton.o -o test_inet.js --js-library ../src/library_node_sockets.js
+test_inet1: test_inet4.c test_inet6.c ../src/library_inet.js
+	$(EMCC) test_inet6.c -o test_inet6.js --js-library ../src/library_inet.js
+	$(EMCC) test_inet4.c -o test_inet4.js --js-library ../src/library_inet.js
+
+test_inet2: test_inet6.c test_inet4.c inet_ntop.o inet_pton.o
+	$(EMCC) test_inet6.c ../libs/inet_ntop.o ../libs/inet_pton.o -o test_inet6.js
+	$(EMCC) test_inet4.c ../libs/inet_ntop.o ../libs/inet_pton.o -o test_inet4.js
 
 chrome-ext:
 	mkdir -p chrome/
