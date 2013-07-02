@@ -147,7 +147,7 @@ mergeInto(LibraryManager.library, {
    inet_pton6: function(src,dst){
         var addr = Pointer_stringify(src);
         var words;
-        var w,offset,z;
+        var w,offset,z,i;
         /* http://home.deds.nl/~aeron/regex/ */
         var valid6regx=/^((?=.*::)(?!.*::.+::)(::)?([\dA-F]{1,4}:(:|\b)|){5}|([\dA-F]{1,4}:){6})((([\dA-F]{1,4}((?!\3)::|:\b|$))|(?!\2\3)){2}|(((2[0-4]|1\d|[1-9])?\d|25[0-5])\.?\b){4})$/i
         if(!valid6regx.test(addr)){
