@@ -52,7 +52,7 @@ mergeInto(LibraryManager.library, {
     return 1;
    },
 
-   inet_ntop4__deps: ['inet_ntoa_raw'],
+   inet_ntop4__deps: ['__setErrNo', '$ERRNO_CODES','inet_ntoa_raw'],
    inet_ntop4: function(src,dst,size){
         var str = _inet_ntoa_raw(getValue(src, 'i32'));
         if(str.length+1 > size){
@@ -63,7 +63,7 @@ mergeInto(LibraryManager.library, {
         return dst;
    },
 
-   inet_ntop6__deps: ['inet_ntop6_raw'],
+   inet_ntop6__deps: ['__setErrNo', '$ERRNO_CODES','inet_ntop6_raw'],
    inet_ntop6: function(src, dst, size){
         var str = _inet_ntop6_raw(src);
         if(str.length+1 > size){
