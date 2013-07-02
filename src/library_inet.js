@@ -8,6 +8,7 @@ mergeInto(LibraryManager.library, {
                 return _inet_ntop6(src,dst,size);
             default:
                 ___setErrNo(ERRNO_CODES.EAFNOSUPPORT);
+                return 0;
         }
    },
    inet_pton__deps: ['__setErrNo', '$ERRNO_CODES','inet_pton4','inet_pton6'],
@@ -19,6 +20,7 @@ mergeInto(LibraryManager.library, {
                 return _inet_pton6(src,dst);
             default:
                 ___setErrNo(ERRNO_CODES.EAFNOSUPPORT);
+                return -1;
         }
    },
    inet_addr: function(ptr) {
