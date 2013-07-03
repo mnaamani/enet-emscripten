@@ -33,7 +33,10 @@ int main(int argc, char *argv[])
         return 0;
 	}
 
-    inet_pton(AF_INET6,"::1",&server.sin6_addr);
+    if(argc > 1)
+        inet_pton(AF_INET6,argv[1],&server.sin6_addr);
+    else
+        inet_pton(AF_INET6,"::ffff:127.0.0.1",&server.sin6_addr);
 
     server.sin6_port = htons(PORT);
 

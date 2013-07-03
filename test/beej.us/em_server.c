@@ -27,7 +27,7 @@ int main(int argc, char *argv[])
 {
     struct sockaddr_in server;
 
-    inet_pton(AF_INET,"127.0.0.1", &server.sin_addr);
+    inet_pton(AF_INET,"0.0.0.0", &server.sin_addr);
     server.sin_port = htons(PORT);
 
     if ((serverfd = socket(AF_INET,SOCK_STREAM,0)) == -1){
