@@ -145,9 +145,12 @@ mergeInto(LibraryManager.library, {
         setValue(dst, ret, 'i32');
         return 1;
    },
-   inet_pton6__deps: ['htons'],
-   inet_pton6: function(src,dst){
-        var addr = Pointer_stringify(src);
+   inet_pton6__deps: ['inet_pton6_raw'],
+   inet_pton6:function(src,dst){
+        return _inet_pton6_raw(Pointer_stringify(src),dst);
+   },
+   inet_pton6_raw__deps:['htons'],
+   inet_pton6_raw: function(addr,dst){
         var words;
         var w,offset,z,i;
         /* http://home.deds.nl/~aeron/regex/ */

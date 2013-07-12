@@ -6,8 +6,6 @@
 #include <enet/enet.h>
 #include <emscripten/emscripten.h>
 
-extern void init_enet_sockets_backend();
-
 //globals are a bad idea.. this is just for testing..
 ENetHost *server, *client;
 ENetPeer *peer;
@@ -28,14 +26,15 @@ ENetHost * createHost(int port,char *identifier){
                                   0      /* assume any amount of outgoing bandwidth */);
     if (host == NULL)
     {
+        perror("createHost:");
         fprintf (stderr,"An error occurred while trying to create an ENet host on port %d.\n",port);
-    }
-    printf("%s successfully created on port: %d\n",identifier, port);
+    } else
+        printf("%s successfully created on port: %d\n",identifier, port);
+
     return host;
 }
 
 int main(int argc, char **argv ){
-    init_enet_sockets_backend();
     enet_initialize();
     client = server = NULL;
     peer = NULL;
@@ -44,17 +43,18 @@ int main(int argc, char **argv ){
 	    if(strcmp(argv[1],"server")==0 || strcmp(argv[2],"server")==0) server = createHost(5000,"server");
 	    if(strcmp(argv[1],"client")==0 || strcmp(argv[2],"client")==0) client = createHost(5001,"client");
     }else{
-	server = createHost(5000,"server");
+        server = createHost(5000,"server");
     }
+
     if( server == NULL && client == NULL ){
-	fprintf(stderr,"invalid arguments. specify either server or client, or no arguments for default server.\n");
-	 exit(0);//at aleast one host should be created
+    	fprintf(stderr,"neither server or client was created.\n");
+	    exit(0);
     }
 
     if(client != NULL ){
 	    ENetAddress address;
 	    struct in_addr A;
-	    inet_aton("127.0.0.1",&A);
+        inet_aton("127.0.0.1",&A);
 	    address.host = A.s_addr;
 	    address.port = 5000;
 	    peer = enet_host_connect(client,&address,2,0);

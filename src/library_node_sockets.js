@@ -35,24 +35,12 @@ mergeInto(LibraryManager.library, {
     inet_ntoa_raw: function(addr) {
         return (addr & 0xff) + '.' + ((addr >> 8) & 0xff) + '.' + ((addr >> 16) & 0xff) + '.' + ((addr >> 24) & 0xff)
     },
-    inet_pton_raw: function(str,in6_addr_ptr){
-        ccall('inet_pton','number',['number','string','number'],
-            [ {{{ cDefine('AF_INET6') }}}, str, in6_addr_ptr ]);
-    },
-    inet_ntop_raw: function(in6_addr_ptr){
-        if(typeof NodeSockets.inet_ntop_raw.buffer === 'undefined'){
-            NodeSockets.inet_ntop_raw.buffer = _malloc(64);
-        }
-        ccall('inet_ntop','number',['number','number','number','number'],
-            [ {{{ cDefine('AF_INET6') }}}, in6_addr_ptr, NodeSockets.inet_ntop_raw.buffer, 64 ]);
-        return Pointer_stringify(NodeSockets.inet_ntop_raw.buffer);
-    },
     DGRAM:function(){
         if(typeof require !== 'undefined') return require("dgram");//node or browserified
 #if CHROME_SOCKETS
-        if(chrome && chrome.socket) return NodeSockets.ChromeDgram();
+        if(window["chrome"] && window["chrome"]["socket"]) return NodeSockets.ChromeDgram();
 #endif
-        assert(false);        
+        assert(false,"no dgram sockets backend found");
     },
     NET:function(){
         if(typeof require !== 'undefined') return require("net");//node or browserified
@@ -72,8 +60,8 @@ mergeInto(LibraryManager.library, {
          */
         var exports = {};
 
-        exports.createSocket = function (type, message_event_callback){
-            assert( type === 'udp4');
+        exports["createSocket"] = function (type, message_event_callback){
+            assert( type === 'udp4', "only supporting udp4 sockets in chrome");
             return new UDPSocket(message_event_callback);
         }
 
@@ -81,7 +69,7 @@ mergeInto(LibraryManager.library, {
             var self = this;
             self._event_listeners = {};
 
-            self.on("listening",function(){
+            self["on"]("listening",function(){
                 //send pending datagrams..
                 self.__pending.forEach(function(job){
                     job.socket_id = self.__socket_id;
@@ -90,31 +78,32 @@ mergeInto(LibraryManager.library, {
                 delete self.__pending;
                 //start polling socket for incoming datagrams
                 self.__poll_interval = setInterval(do_recv,30);
+#if SOCKET_DEBUG
                 console.log("chrome socket bound to:",JSON.stringify(self.address()));
+#endif
             });
 
-            if(msg_evt_cb) self.on("message",msg_evt_cb);
+            if(msg_evt_cb) self["on"]("message",msg_evt_cb);
 
             function do_recv(){
                 if(!self.__socket_id) return;
-                chrome.socket.recvFrom(self.__socket_id, undefined, function(info){
+                window["chrome"]["socket"]["recvFrom"](self.__socket_id, undefined, function(info){
                     var buff;
                     //todo - set correct address family
                     //todo - error detection.
-                    if(info.resultCode > 0){
-                        buff = new Uint8Array(info.data);
-                        self.emit("message",buff,{address:info.address,port:info.port,size:info.data.byteLength,family:'IPv4'});
+                    if(info["resultCode"] > 0){
+                        buff = new Uint8Array(info["data"]);
+                        self.emit("message",buff,{"address":info["address"],"port":info["port"],"size":info["data"]["byteLength"],"family":"IPv4"});
                     }
                 });
             }
             self.__pending = [];//queued datagrams to send (if app tried to send before socket is ready)
         }
 
-        UDPSocket.prototype.on = function(e,cb){
+        UDPSocket.prototype["on"] = function(evt,callback){
             //used to register callbacks
             //store event name e in this._events 
-            this._event_listeners[e] ? this._event_listeners[e].push(cb) : this._event_listeners[e]=[cb];
-
+            this._event_listeners[evt] ? this._event_listeners[evt].push(callback) : this._event_listeners[evt]=[callback];
         };
 
         UDPSocket.prototype.emit = function(e){
@@ -133,7 +122,7 @@ mergeInto(LibraryManager.library, {
         UDPSocket.prototype.close = function(){
             //Close the underlying socket and stop listening for data on it.
             if(!self.__socket_id) return;
-            chrome.socket.destroy(self.__socket_id);
+            window["chrome"]["socket"]["destroy"](self.__socket_id);
             clearInterval(self.__poll_interval);
             delete self.__poll_interval;
         };
@@ -144,12 +133,12 @@ mergeInto(LibraryManager.library, {
             port = port || 0;
             if(self.__socket_id || self.__bound ) return;//only bind once!
             self.__bound = true;
-            chrome.socket.create('udp',{},function(socketInfo){
-                self.__socket_id = socketInfo.socketId;
-                chrome.socket.bind(self.__socket_id,address,port,function(result){
-                    chrome.socket.getInfo(self.__socket_id,function(info){
-                      self.__local_address = info.localAddress;
-                      self.__local_port = info.localPort;
+            window["chrome"]["socket"]["create"]('udp',{},function(socketInfo){
+                self.__socket_id = socketInfo["socketId"];
+                window["chrome"]["socket"]["bind"](self.__socket_id,address,port,function(result){
+                    window["chrome"]["socket"]["getInfo"](self.__socket_id,function(info){
+                      self.__local_address = info["localAddress"];
+                      self.__local_port = info["localPort"];
                       self.emit("listening");
                     });
                 });
@@ -157,7 +146,7 @@ mergeInto(LibraryManager.library, {
         };
 
         UDPSocket.prototype.address = function(){
-            return({address:this.__local_address,port:this.__local_port});
+            return({"address":this.__local_address,"port":this.__local_port});
         };
 
         UDPSocket.prototype.setBroadcast = function(flag){
@@ -194,11 +183,11 @@ mergeInto(LibraryManager.library, {
                 buff = job.buff.subarray(job.offset,job.offset+job.length);
             }
             data = buff.buffer;
-            chrome.socket.sendTo(job.socket_id,data,job.address,job.port,function(result){
+            window["chrome"]["socket"]["sendTo"](job.socket_id,data,job.address,job.port,function(result){
                 var err;
-                if(result.bytesWritten < data.byteLength ) err = 'truncation-error';
-                if(result.bytesWritten < 0 ) err = 'send-error';
-                if(job.callback) job.callback(err,result.bytesWritten);
+                if(result["bytesWritten"] < data.byteLength ) err = 'truncation-error';
+                if(result["bytesWritten"] < 0 ) err = 'send-error';
+                if(job.callback) job.callback(err,result["bytesWritten"]);
             });
         }
 
@@ -212,8 +201,9 @@ mergeInto(LibraryManager.library, {
      // int close(int fildes);
      // http://pubs.opengroup.org/onlinepubs/000095399/functions/close.html
      if(FS.streams[fildes].socket){
-        if(typeof FS.streams[fildes].close == 'function') FS.streams[fildes].close();//udp sockets, tcp listening sockets
-        if(typeof FS.streams[fildes].end == 'function') FS.streams[fildes].end();//tcp connections
+        if(FS.streams[fildes].interval) clearInterval(FS.streams[fildes].interval);
+        if(typeof FS.streams[fildes].socket["close"] == "function") FS.streams[fildes].socket["close"]();//udp sockets, tcp listening sockets
+        if(typeof FS.streams[fildes].socket["end"] == "function") FS.streams[fildes].socket["end"]();//tcp connections
         return 0;
      }
 
@@ -263,7 +253,8 @@ mergeInto(LibraryManager.library, {
             connected: false,
             stream: false,
             dgram: true,
-            socket: new NodeSockets.DGRAM().createSocket(v6?'udp6':'udp4'),
+            socket: NodeSockets.DGRAM()["createSocket"](v6?'udp6':'udp4'),
+            bound: false,
             inQueue: []
           });
          }else{
@@ -271,18 +262,21 @@ mergeInto(LibraryManager.library, {
             return -1;
          }
 #if SOCKET_DEBUG
-        console.log("created socket:",fd);
+        console.log("created socket fd:",fd);
 #endif
          return fd;
         }catch(e){
             ___setErrNo(ERRNO_CODES.EACCES);
+#if SOCKET_DEBUG
+            console.log(e);
+#end if
             return -1;
         }
     },
    /*
     *   http://pubs.opengroup.org/onlinepubs/009695399/functions/connect.html
     */
-    connect__deps: ['$NodeSockets', 'htons', '__setErrNo', '$ERRNO_CODES'],
+    connect__deps: ['$NodeSockets', 'htons', '__setErrNo', '$ERRNO_CODES','inet_ntop6_raw'],
     connect: function(fd, addr, addrlen) {
         if(typeof fd == 'number' && (fd > 64 || fd < 1) ){
             ___setErrNo(ERRNO_CODES.EBADF); return -1;
@@ -292,11 +286,7 @@ mergeInto(LibraryManager.library, {
             ___setErrNo(ERRNO_CODES.ENOTSOCK); return -1;
         }
 
-        if(info.dgram){
-            if (info.socket._bound || info.socket.__receiving){
-
-            }else { _bind(fd); }
-        }
+        if(info.dgram && !info.bound) _bind(fd);
 
         if(info.stream && info.CONNECTING){
             ___setErrNo(ERRNO_CODES.EALREADY); return -1;
@@ -324,7 +314,7 @@ mergeInto(LibraryManager.library, {
                 break;
             case NodeSockets.sockaddr_in6_layout.__size__:
                 info.port = _htons(getValue(addr + NodeSockets.sockaddr_in6_layout.sin6_port, 'i16'));
-                info.host = NodeSockets.inet_ntop_raw(addr+NodeSockets.sockaddr_in6_layout.sin6_addr);
+                info.host = _inet_ntop6_raw(addr+NodeSockets.sockaddr_in6_layout.sin6_addr);
                 break;
         }
         if(!info.stream) return 0;
@@ -345,13 +335,13 @@ mergeInto(LibraryManager.library, {
 
             function send(data) {
                 var buff = new Buffer(data);
-                if(!info.socket.write(buff)) info.paused = true;
+                if(!info.socket["write"](buff)) info.paused = true;
             }
             function trySend() {
                 if (!info.ESTABLISHED) {
                   if (!intervalling) {
                     intervalling = true;
-                    interval = setInterval(trySend, 100);
+                    info.interval = setInterval(trySend, 100);
                   }
                   return;
                 }
@@ -361,12 +351,12 @@ mergeInto(LibraryManager.library, {
                 outQueue.length = 0;
                 if (intervalling) {
                     intervalling = false;
-                    clearInterval(interval);
+                    if(info.interval) clearInterval(info.interval);
                 }
             }
 
             try{
-              info.socket = new NodeSockets.NET().connect({host:info.host,port:info.port,localAddress:info.local_host},function(){
+              info.socket = new NodeSockets.NET()["connect"]({host:info.host,port:info.port,localAddress:info.local_host},function(){
                 info.CONNECTING = false;
                 info.ESTABLISHED = true;
               });
@@ -374,19 +364,19 @@ mergeInto(LibraryManager.library, {
                 return -1;
             }
 
-            info.socket.on('drain',function(){
+            info.socket["on"]('drain',function(){
                info.paused = false;
             });
 
-            info.socket.on('data',function(buf){
+            info.socket["on"]('data',function(buf){
                 info.inQueue.push(new Uint8Array(buf));
             });
 
-            info.socket.on('close',onEnded);
-            info.socket.on('error',onEnded);
-            info.socket.on('end',onEnded);
-            info.socket.on('timeout',function(){
-                info.socket.end();
+            info.socket["on"]('close',onEnded);
+            info.socket["on"]('error',onEnded);
+            info.socket["on"]('end',onEnded);
+            info.socket["on"]('timeout',function(){
+                info.socket["end"]();
                 onEnded();
             });
         })(info);
@@ -407,10 +397,11 @@ mergeInto(LibraryManager.library, {
         if (!info || !info.socket) {
             ___setErrNo(ERRNO_CODES.ENOTSOCK); return -1;
         }
+        if(info.dgram && !info.bound) _bind(fd);
         info.sender(HEAPU8.subarray(buf, buf+len));
         return len;
     },
-    sendmsg__deps: ['$NodeSockets', 'connect'],
+    sendmsg__deps: ['$NodeSockets', 'connect','inet_ntop6_raw'],
     sendmsg: function(fd, msg, flags) {
         var info = FS.streams[fd];
         if (!info || !info.socket) {
@@ -455,13 +446,14 @@ mergeInto(LibraryManager.library, {
                 break;
             case NodeSockets.sockaddr_in6_layout.__size__:
                 port = _htons(getValue(name + NodeSockets.sockaddr_in6_layout.sin6_port, 'i16'));
-                host = NodeSockets.inet_ntop_raw(name+NodeSockets.sockaddr_in6_layout.sin6_addr);
+                host = _inet_ntop6_raw(name+NodeSockets.sockaddr_in6_layout.sin6_addr);
                 break;
         }
+        if(info.dgram && !info.bound) _bind(fd);
         info.sender(buffer,host,port); // send all the iovs as a single message
         return ret;
     },
-    recvmsg__deps: ['$NodeSockets', 'connect', 'recv', '__setErrNo', '$ERRNO_CODES', 'htons'],
+    recvmsg__deps: ['$NodeSockets', 'connect', 'recv', '__setErrNo', '$ERRNO_CODES', 'htons', 'inet_pton6_raw'],
     recvmsg: function(fd, msg, flags) {
         var info = FS.streams[fd];
         if (!info || !info.socket) {
@@ -492,10 +484,10 @@ mergeInto(LibraryManager.library, {
                 break;
             case NodeSockets.sockaddr_in6_layout.__size__:
                 if(info.connected){
-                    NodeSockets.inet_pton_raw(info.host,name+NodeSockets.sockaddr_in6_layout.sin6_addr);
+                    _inet_pton6_raw(info.host,name+NodeSockets.sockaddr_in6_layout.sin6_addr);
                     {{{ makeSetValue('name', 'NodeSockets.sockaddr_in6_layout.sin6_port', '_htons(info.port)', 'i16') }}};
                 }else{
-                    NodeSockets.inet_pton_raw(buffer.from.host,name+NodeSockets.sockaddr_in6_layout.sin6_addr);
+                    _inet_pton6_raw(buffer.from.host,name+NodeSockets.sockaddr_in6_layout.sin6_addr);
                     {{{ makeSetValue('name', 'NodeSockets.sockaddr_in6_layout.sin6_port', '_htons(buffer.from.port)', 'i16') }}};
                 }
                 break;
@@ -533,7 +525,7 @@ mergeInto(LibraryManager.library, {
         return ret;
     },
     
-    recvfrom__deps: ['$NodeSockets'],
+    recvfrom__deps: ['$NodeSockets','inet_pton6_raw','__setErrNo', '$ERRNO_CODES'],
     recvfrom: function(fd, buf, len, flags, addr, addrlen) {
         var info = FS.streams[fd];
         if (!info || !info.socket) {
@@ -553,7 +545,7 @@ mergeInto(LibraryManager.library, {
                     {{{ makeSetValue('addr', 'NodeSockets.sockaddr_in_layout.sin_port', '_htons(buffer.from.port)', 'i16') }}};
                     break;
                 case NodeSockets.sockaddr_in6_layout.__size__:
-                    NodeSockets.inet_pton_raw(buffer.from.host,addr+NodeSockets.sockaddr_in6_layout.sin6_addr);
+                    _inet_pton6_raw(buffer.from.host,addr+NodeSockets.sockaddr_in6_layout.sin6_addr);
                     {{{ makeSetValue('addr', 'NodeSockets.sockaddr_in_layout.sin6_port', '_htons(buffer.from.port)', 'i16') }}};
                     break;
             }
@@ -582,9 +574,10 @@ mergeInto(LibraryManager.library, {
         }
         //todo: if how = 0 disable sending info.sender=function(){return -1;}
         //             = 1 disable receiving (delete info.inQueue?)
+        if(info.interval) clearInterval(info.interval);
         if(info.socket && fd > 63){
-            info.socket.close && info.socket.close();
-            info.socket.end && info.socket.end();
+            info.socket["close"] && info.socket["close"]();
+            info.socket["end"] && info.socket["end"]();
         }
         if(info.socket) _close(fd);
         
@@ -610,7 +603,7 @@ mergeInto(LibraryManager.library, {
         return 0;
     },
     
-    bind__deps: ['connect'],
+    bind__deps: ['connect','inet_ntop6_raw'],
     bind: function(fd, addr, addrlen) {
         if(typeof fd == 'number' && (fd > 64 || fd < 1) ){
             ___setErrNo(ERRNO_CODES.EBADF); return -1;
@@ -619,7 +612,12 @@ mergeInto(LibraryManager.library, {
         if (!info || !info.socket) {
             ___setErrNo(ERRNO_CODES.ENOTSOCK); return -1;
         }
-        
+        if(info.dgram && info.bound){
+            ___setErrNo(ERRNO_CODES.EINVAL); return -1;
+        }
+        if(info.connected){
+            ___setErrNo(ERRNO_CODES.EISCONN); return -1;
+        }
         try{
           if(addr){
             assert(info.addrlen === addrlen);
@@ -631,17 +629,22 @@ mergeInto(LibraryManager.library, {
                     break;
                 case NodeSockets.sockaddr_in6_layout.__size__:
                     info.local_port = _htons(getValue(addr + NodeSockets.sockaddr_in6_layout.sin6_port, 'i16'));
-                    info.local_host = NodeSockets.inet_ntop_raw(addr+NodeSockets.sockaddr_in6_layout.sin6_addr);
+                    info.local_host = _inet_ntop6_raw(addr+NodeSockets.sockaddr_in6_layout.sin6_addr);
                     break;
             }
+          }
 
+          if(info.stream){
+            //we dont actually bind a tcp node socket yet only store the local address to to use
+            //when  connect or listen are called.
+            return 0;
           }
 
           if(info.dgram){
-                //if already bound return with error
+               info.bound = true;
                info.hasData = function(){return info.inQueue.length>0}
-               info.socket.bind(info.local_port||0,info.local_host||undefined);
-               info.socket.on('message',function(msg,rinfo){
+               info.socket["bind"](info.local_port||0,info.local_host||undefined);
+               info.socket["on"]('message',function(msg,rinfo){
                     if(info.host && info.connected){
                         //connected dgram socket will only accept packets from info.host:info.port
                         if(info.host !== rinfo.address || info.port !== rinfo.port) return;
@@ -651,10 +654,9 @@ mergeInto(LibraryManager.library, {
 #else
                     var buf = new Uint8Array(msg);
 #endif                    
-                    //console.log("received:",msg);
-                    buf.from = {
-                        host: rinfo.address,
-                        port: rinfo.port
+                    buf.from= {
+                        host: rinfo["address"],
+                        port: rinfo["port"]
                     }
                     info.inQueue.push(buf);
                });
@@ -665,12 +667,14 @@ mergeInto(LibraryManager.library, {
 #else
                     var buffer = new Buffer(buf);
 #endif
-                    //console.log("sending:",buffer,"to:",ip,port);
-                    info.socket.send(buffer,0,buffer.length,port,ip);
+                    info.socket["send"](buffer,0,buffer.length,port,ip);
                }
           }
           
         }catch(e){
+#if SOCKET_DEBUG
+            console.log(e);
+#endif
             return -1;
         }
         return 0;
@@ -685,18 +689,20 @@ mergeInto(LibraryManager.library, {
             ___setErrNo(ERRNO_CODES.ENOTSOCK); return -1;
         }
         assert(info.stream);
-        info.socket = NodeSockets.NET().createServer();
+        info.socket = NodeSockets.NET()["createServer"]();
         info.server = info.socket;//mark it as a listening socket
         info.connQueue = [];
-        info.socket.listen(info.local_port||0,info.local_host,backlog,function(){
-            //console.log('listening on',info.local_port||0,info.local_host);
+        info.socket["listen"](info.local_port||0,info.local_host,backlog,function(){
+#if SOCKET_DEBUG
+            console.log('listening on',info.local_port||0,info.local_host);
+#endif
         });
-        info.socket.on("connection",function(socket){
+        info.socket["on"]("connection",function(socket){
              info.connQueue.push(socket);
         });
         return 0;
     },
-    
+    accept__deps: ['$NodeSockets','inet_pton6_raw','__setErrNo', '$ERRNO_CODES'],
     accept: function(fd, addr, addrlen) {
         if(typeof fd == 'number' && (fd > 64 || fd < 1) ){
             ___setErrNo(ERRNO_CODES.EBADF); return -1;
@@ -725,8 +731,8 @@ mergeInto(LibraryManager.library, {
         var conn = FS.streams[newfd];
         conn.socket = info.connQueue.shift();
         
-        conn.port = _htons(conn.socket.remotePort);
-        conn.host = conn.socket.remoteAddress;
+        conn.port = _htons(conn.socket["remotePort"]);
+        conn.host = conn.socket["remoteAddress"];
                 
         if (addr) {
             switch(info.addrlen){
@@ -737,7 +743,7 @@ mergeInto(LibraryManager.library, {
                     setValue(addrlen, NodeSockets.sockaddr_in_layout.__size__, 'i32');
                     break;
                 case NodeSockets.sockaddr_in6_layout.__size__:
-                    NodeSockets.inet_pton_raw(conn.host,addr + NodeSockets.sockaddr_in6_layout.sin6_addr);
+                    _inet_pton6_raw(conn.host,addr + NodeSockets.sockaddr_in6_layout.sin6_addr);
                     setValue(addr + NodeSockets.sockaddr_in6_layout.sin6_port, conn.port, 'i16');
                     setValue(addr + NodeSockets.sockaddr_in6_layout.sin6_family, {{{ cDefine('AF_INET6') }}}, 'i32');
                     setValue(addrlen, NodeSockets.sockaddr_in6_layout.__size__, 'i32');
@@ -762,13 +768,13 @@ mergeInto(LibraryManager.library, {
 
             function send(data) {
                 var buff = new Buffer(data);
-                if(!info.socket.write(buff)) info.paused = true;
+                if(!info.socket["write"](buff)) info.paused = true;
             }
             function trySend() {
                 if (!info.ESTABLISHED) {
                   if (!intervalling) {
                     intervalling = true;
-                    interval = setInterval(trySend, 100);
+                    info.interval = setInterval(trySend, 100);
                   }
                   return;
                 }
@@ -778,23 +784,23 @@ mergeInto(LibraryManager.library, {
                 outQueue.length = 0;
                 if (intervalling) {
                     intervalling = false;
-                    clearInterval(interval);
+                    if(info.interval) clearInterval(info.interval);
                 }
             }
 
-            info.socket.on('drain',function(){
+            info.socket["on"]('drain',function(){
                info.paused = false;
             });
 
-            info.socket.on('data',function(buf){
+            info.socket["on"]('data',function(buf){
                 info.inQueue.push(new Uint8Array(buf));
             });
 
-            info.socket.on('close',onEnded);
-            info.socket.on('error',onEnded);
-            info.socket.on('end',onEnded);
-            info.socket.on('timeout',function(){
-                info.socket.end();
+            info.socket["on"]('close',onEnded);
+            info.socket["on"]('error',onEnded);
+            info.socket["on"]('end',onEnded);
+            info.socket["on"]('timeout',function(){
+                info.socket["end"]();
                 onEnded();
             });
         })(conn);
@@ -819,13 +825,13 @@ mergeInto(LibraryManager.library, {
           // we do create it when the socket is connected, 
           // but other implementations may create it lazily
           if(info.stream){
-           if ((info.socket._readableState.ended || info.socket.errorEmitted ) && info.inQueue.length == 0) {
+           if ((info.socket["_readableState"]["ended"] || info.socket["errorEmitted"] ) && info.inQueue.length == 0) {
              errorCondition = -1;
              return false;
            }
            return info.hasData && info.hasData();
           }else{
-            if(info.socket._receiving || info.socket._bound) return (info.hasData && info.hasData());           
+            if(info.socket["_receiving"] || info.socket["_bound"]) return (info.hasData && info.hasData());           
             errorCondition = -1;
             return false;
           }
@@ -836,13 +842,13 @@ mergeInto(LibraryManager.library, {
           // we do create it when the socket is connected, 
           // but other implementations may create it lazily
           if(info.stream){
-              if (info.socket._writableState.ended || info.socket._writableState.ending || info.socket.errorEmitted) {
+              if (info.socket["_writableState"]["ended"] || info.socket["_writableState"]["ending"] || info.socket["errorEmitted"]) {
                 errorCondition = -1;
                 return false;
               }
-              return info.socket && info.socket.writable
+              return info.socket && info.socket["writable"]
           }else{
-            if(info.socket._receiving || info.socket._bound) return (info.hasData && info.hasData());           
+            if(info.socket["_receiving"] || info.socket["_bound"]) return (info.hasData && info.hasData());           
             errorCondition = -1;
             return false;
           }
