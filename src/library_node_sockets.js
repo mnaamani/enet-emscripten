@@ -49,7 +49,14 @@ mergeInto(LibraryManager.library, {
 #endif
         assert(false);
     },
-
+    buffer2uint8array: function(buffer){
+      var arraybuffer = new ArrayBuffer(buffer.length);
+      var uint8Array = new Uint8Array(arraybuffer);
+      for(var i = 0; i < buffer.length; i++) {
+        uint8Array[i] = buffer["readUInt8"](i);//cannot index Buffer with [] if browserified..
+      }
+      return uint8Array;
+    },
 #if CHROME_SOCKETS
     ChromeNet: undefined,       /* use https://github.com/GoogleChrome/net-chromeify.git ? (Apache license)*/
     ChromeDgram: function(){
@@ -200,19 +207,26 @@ mergeInto(LibraryManager.library, {
    close: function(fildes) {
      // int close(int fildes);
      // http://pubs.opengroup.org/onlinepubs/000095399/functions/close.html
-     if(FS.streams[fildes].socket){
-        if(FS.streams[fildes].interval) clearInterval(FS.streams[fildes].interval);
-        if(typeof FS.streams[fildes].socket["close"] == "function") FS.streams[fildes].socket["close"]();//udp sockets, tcp listening sockets
-        if(typeof FS.streams[fildes].socket["end"] == "function") FS.streams[fildes].socket["end"]();//tcp connections
+     var stream = FS.getStream(fildes);
+     if(stream) {
+       if(stream.socket){
+         if(stream.interval) clearInterval(stream.interval);
+         if(typeof stream.socket["close"] == "function") stream.socket["close"]();//udp sockets, tcp listening sockets
+         if(typeof stream.socket["end"] == "function") stream.socket["end"]();//tcp connections
+         FS.closeStream(stream.fd);
+         return 0;
+       } else {
+        try {
+          if (stream.stream_ops.close) {
+            stream.stream_ops.close(stream);
+          }
+        } catch (e) {
+          throw e;
+        } finally {
+          FS.closeStream(stream.fd);
+        }
         return 0;
-     }
-
-     if (FS.streams[fildes]) {
-      if (FS.streams[fildes].currentEntry) {
-        _free(FS.streams[fildes].currentEntry);
-      }
-      FS.streams[fildes] = null;
-      return 0;
+       }
      } else {
       ___setErrNo(ERRNO_CODES.EBADF);
       return -1;
@@ -239,16 +253,16 @@ mergeInto(LibraryManager.library, {
 
         try{
          if(stream){
-          fd = FS.createFileHandle({
+          fd = FS.createStream({
             addrlen : v6 ? NodeSockets.sockaddr_in6_layout.__size__ : NodeSockets.sockaddr_in_layout.__size__ ,
             connected: false,
             stream: true,
             socket: true, //real socket will be created when bind() or connect() is called 
                           //to choose between server and connection sockets
             inQueue: []
-          });
+          }).fd;
          }else if(dgram){
-          fd = FS.createFileHandle({
+          fd = FS.createStream({
             addrlen : v6 ? NodeSockets.sockaddr_in6_layout.__size__ : NodeSockets.sockaddr_in_layout.__size__ ,
             connected: false,
             stream: false,
@@ -256,7 +270,7 @@ mergeInto(LibraryManager.library, {
             socket: NodeSockets.DGRAM()["createSocket"](v6?'udp6':'udp4'),
             bound: false,
             inQueue: []
-          });
+          }).fd;
          }else{
             ___setErrNo(ERRNO_CODES.EPROTOTYPE);
             return -1;
@@ -652,7 +666,7 @@ mergeInto(LibraryManager.library, {
 #if CHROME_SOCKETS
                     var buf = msg;
 #else
-                    var buf = new Uint8Array(msg);
+                    var buf = msg instanceof ArrayBuffer ? new Uint8Array(msg) : NodeSockets.buffer2uint8array(msg);
 #endif                    
                     buf.from= {
                         host: rinfo["address"],
@@ -719,10 +733,10 @@ mergeInto(LibraryManager.library, {
             ___setErrNo(ERRNO_CODES.EAGAIN); return -1;
         }
         
-        var newfd = FS.createFileHandle({
+        var newfd = FS.createStream({
             socket:false,   //newfd will be > 63
             inQueue:[]
-        });
+        }).fd;
 
         if(newfd == -1){
             ___setErrNo(ERRNO_CODES.ENFILE); return -1;
