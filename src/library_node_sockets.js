@@ -235,8 +235,7 @@ mergeInto(LibraryManager.library, {
     socket__deps: ['$NodeSockets', '__setErrNo', '$ERRNO_CODES'],
     socket: function(family, type, protocol) {
         var fd;
-        if(!(family == {{{ cDefine('AF_INET') }}} || family == {{{ cDefine('PF_INET') }}} || 
-             family == {{{ cDefine('AF_INET6') }}} || family == {{{ cDefine('PF_INET6') }}}))
+        if(!(family == {{{ cDefine('AF_INET') }}} || family == {{{ cDefine('AF_INET6') }}}))
         {
             ___setErrNo(ERRNO_CODES.EAFNOSUPPORT);
             return -1;
