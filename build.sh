@@ -34,7 +34,9 @@ then
 	tar xzf "enet-${ENET_VERSION}.tar.gz"
 	pushd "enet-${ENET_VERSION}"
 	BASEDIR=$(dirname $(pwd))
-	${EMSCRIPTEN}/emconfigure ./configure --libdir=${BASEDIR}/libs --includedir=${BASEDIR}/include
+	${EMSCRIPTEN}/emconfigure ./configure --libdir=${BASEDIR}/libs --includedir=${BASEDIR}/include \
+        ac_cv_func_gethostbyaddr_r=no \
+        ac_cv_func_gethostbyname_r=no
 	popd
 fi
 
